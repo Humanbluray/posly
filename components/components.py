@@ -1,44 +1,26 @@
 import flet as ft
-from utils import format_milliers_fr, MAIN_COLOR, THUMB_COLOR, resource_path, BG_COLOR
-from styles import switch_style
+from utils import (
+    format_milliers_fr, MAIN_COLOR, resource_path, BG_COLOR, CARD_BG, TEXT_PRIMARY, TEXT_SECONDARY,
+    
+)
+from styles import switch_style, button_primary_style
 DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/images/19005357.png"
 
 
-class MyButton(ft.Container):
-    """
-    Classe qui définit les boutons
-    """
-    def __init__(self, title: str, icon: str, click):
+class MyButton(ft.ElevatedButton):
+    def __init__(self, title: str, icon: str = None, click=None):
+        content_row = []
+        if icon:
+            content_row.append(ft.Image(src=icon, width=18, height=18))
+        content_row.append(ft.Text(title, size=15, font_family="PPM", color="white"))
+
         super().__init__(
-            bgcolor=MAIN_COLOR, padding=10, height=40,
-            scale=ft.Scale(1),
-            animate_scale=ft.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
-            on_hover=self.hover_effect,
+            content=ft.Row(content_row, alignment=ft.MainAxisAlignment.CENTER, spacing=8),
+            style=button_primary_style,
             on_click=click,
-            border_radius=10,
+            height=44,
         )
-        if icon is None:
-            self.content = ft.Row(
-                controls=[
-                    ft.Text(title, size=15, font_family="PPM", color='white'),
-                ], alignment=ft.MainAxisAlignment.CENTER
-            )
-        else:
-            self.content = ft.Row(
-                controls=[
-                    ft.Image(src=icon, width=16, height=16),
-                    ft.Text(title, size=15, font_family="PPM", color='white'),
-                ], alignment=ft.MainAxisAlignment.CENTER
-            )
-
-    def hover_effect(self, e):
-        if e.data == "true":
-            self.scale = 1.05
-        else:
-            self.scale = 1
-
-        self.update()
-
+        
 
 class ActionButton(ft.Container):
     """
@@ -75,7 +57,7 @@ class MyTextButton(ft.Container):
             bgcolor="white", alignment=ft.alignment.center,
             on_click=click, on_hover=self.hover_effect, border_radius=10
         )
-        self.content=ft.Text(title, size=16, font_family="PPM", color=MAIN_COLOR)
+        self.content=ft.Text(title, size=14, font_family="PPM", color=MAIN_COLOR)
 
     def hover_effect(self, e):
         if e.data == "true":
@@ -151,58 +133,56 @@ class CardItem(ft.Card):
             on_hover=self.hover_effect,
             animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
             scale=1,
-            bgcolor="white",
+            bgcolor=CARD_BG,
+            border_radius=16,
             content=ft.Column(
                 spacing=0,
                 controls=[
-                    # Image du produit
                     ft.Image(
-                        src=img_src, 
-                        width=220, 
-                        height=130, 
-                        fit=ft.ImageFit.COVER
+                        src=img_src,
+                        width=220,
+                        height=140,
+                        fit=ft.ImageFit.COVER,
                     ),
-                    # Section descriptive
                     ft.Container(
-                        padding=ft.padding.all(10), 
-                        bgcolor="white",
+                        padding=ft.padding.all(12),
+                        bgcolor=CARD_BG,
                         content=ft.Column(
                             spacing=6,
                             controls=[
-                                # Désignation
                                 ft.Text(
-                                    infos["designation"].upper(), 
-                                    size=13, 
-                                    font_family="PPM", 
-                                    overflow=ft.TextOverflow.ELLIPSIS, 
-                                    max_lines=1
+                                    infos["designation"].upper(),
+                                    size=12,
+                                    font_family="PPM",
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                    max_lines=1,
+                                    color=TEXT_PRIMARY,
                                 ),
-                                # Ligne Prix et Stock
                                 ft.Row(
                                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                     controls=[
                                         ft.Text(
-                                            f"{format_milliers_fr(infos['price'])} FCFA", 
-                                            size=13, 
+                                            f"{format_milliers_fr(infos['price'])} FCFA",
+                                            size=14,
                                             font_family="PEB",
-                                            color=MAIN_COLOR
+                                            color=MAIN_COLOR,
                                         ),
                                         ft.Container(
                                             content=ft.Text(
-                                                f"Qté: {format_milliers_fr(infos['stock'])}", 
-                                                size=10, 
-                                                font_family="PPM", 
-                                                color="white" if infos['stock'] > 0 else "red"
+                                                f"Qté: {format_milliers_fr(infos['stock'])}",
+                                                size=10,
+                                                font_family="PPM",
+                                                color="white"if self.infos['stock'] > 0 else  ft.Colors.RED,
                                             ),
-                                            bgcolor="grey" if infos['stock'] > 0 else "#FFEEEE",
+                                            bgcolor=TEXT_SECONDARY if self.infos['stock'] > 0 else  ft.Colors.RED_50,
                                             padding=ft.padding.symmetric(horizontal=6, vertical=2),
                                             border_radius=4,
                                             visible=(infos['product_type'] != 'repas')
                                         )
                                     ]
                                 ),
-                                # --- Nouvelle Ligne : Switch & TextField pour la réduction ---
+                                # Switch et champ de réduction (inchangé)
                                 ft.Row(
                                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -210,7 +190,7 @@ class CardItem(ft.Card):
                                         ft.Row(
                                             controls=[
                                                 self.switch_reduction,
-                                                ft.Text("Réduc.", size=11, font_family="PPM", color="grey")
+                                                ft.Text("Réduc.", size=11, font_family="PPM", color=TEXT_SECONDARY)
                                             ],
                                             spacing=0
                                         ),
@@ -223,7 +203,8 @@ class CardItem(ft.Card):
                 ]
             )
         )
-
+        
+        
     def toggle_reduction_field(self, e):
         """Active ou désactive le champ de texte selon l'état du switch"""
         self.tf_reduction.disabled = not self.switch_reduction.value

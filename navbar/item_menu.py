@@ -6,13 +6,18 @@ class ItemMenu(ft.Container):
     def __init__(self, title: str, my_icon: str, my_icon_2: str, visible: bool):
         super().__init__(
             shape=ft.BoxShape.RECTANGLE,
-            padding=ft.padding.only(left=10, right=10, top=10, bottom=10),
-            border_radius=24, expand=True, animate=100, scale=ft.Scale(1),
+            padding=ft.padding.only(left=16, right=10, top=8, bottom=8),
+            border_radius=12,
+            expand=True,
+            animate=200,
+            scale=ft.Scale(1),
             animate_scale=ft.Animation(300, ft.AnimationCurve.EASE_IN),
             on_hover=self.hover_ct,
-            height=45,
-            bgcolor=None, visible=visible
+            height=40,
+            bgcolor=None,
+            visible=visible
         )
+        # ... le reste du code inchangé ...
         self.title = title
         self.my_icon = my_icon
         self.my_icon_2 = my_icon_2

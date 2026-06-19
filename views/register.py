@@ -2,19 +2,24 @@ import flet as ft
 import uuid
 import os
 import datetime
-from styles import config_tf_style
+from styles import input_style
 from components.components import MyTextButton, MyButton
 # Importation de ton client Supabase synchrone et admin
 from services.supabase_client import supabase_client, supabase_admin
-from utils import ACCESS_TOKEN, USER_ID, TENANT_ID, USER_NAME, ROLE, resource_path, BG_COLOR, MAIN_COLOR
+from utils import (
+    ACCESS_TOKEN, USER_ID, TENANT_ID, USER_NAME, ROLE, resource_path, BG_COLOR, MAIN_COLOR,
+    CARD_BG, TEXT_PRIMARY, TEXT_SECONDARY, SHADOW_COLOR, SURFACE_COLOR, EXPIRATION_DATE
+)
 
 
 class RegisterView(ft.View):
     def __init__(self, page: ft.Page):
         super().__init__(
-            vertical_alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.MainAxisAlignment.START,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            bgcolor=BG_COLOR, route="/register", padding=20,
+            bgcolor=BG_COLOR, 
+            route="/register", 
+            padding=0,  # Mis à 0 pour coller la barre en haut
         )
         self.page = page
         self.current_step = 1  # Étape 1 : Établissement | Étape 2 : Compte Admin
@@ -26,22 +31,73 @@ class RegisterView(ft.View):
         self.file_picker = ft.FilePicker(on_result=self.on_file_selected)
         self.page.overlay.append(self.file_picker)
 
+        # --- BARRE DE NAVIGATION HAUTE COHÉRENTE ---
+        top_bar = ft.Container(
+            padding=ft.padding.symmetric(horizontal=30, vertical=14),
+            bgcolor=CARD_BG,
+            border=ft.border.only(bottom=ft.BorderSide(1, SHADOW_COLOR)),
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    # Logo à gauche
+                    ft.Row(
+                        spacing=2,
+                        controls=[
+                            ft.Text("Pos", size=24, font_family="PEB", color=TEXT_PRIMARY),
+                            ft.Text("ly", size=24, font_family="PEB", color=MAIN_COLOR),
+                        ],
+                    ),
+                    # Actions à droite
+                    ft.Row(
+                        spacing=12,
+                        controls=[
+                            ft.TextButton(
+                                "Se connecter",
+                                style=ft.ButtonStyle(
+                                    color=TEXT_SECONDARY,
+                                    text_style=ft.TextStyle(size=14, font_family="PPM"),
+                                ),
+                                on_click=lambda e: self.page.go("/"),
+                            ),
+                            ft.TextButton(
+                                "S'inscrire",
+                                style=ft.ButtonStyle(
+                                    color=MAIN_COLOR,  # Actif car on est sur la page d'inscription
+                                    text_style=ft.TextStyle(size=14, font_family="PEB"),
+                                ),
+                                on_click=lambda e: self.page.go("/register"),
+                            ),
+                            ft.TextButton(
+                                "Mot de passe oublié ?",
+                                style=ft.ButtonStyle(
+                                    color=TEXT_SECONDARY,
+                                    text_style=ft.TextStyle(size=14, font_family="PPM"),
+                                ),
+                                on_click=lambda e: self.page.go("/forgot-password"),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
         # --- CHAMPS ÉTAPE 1 : Établissement/Entreprise ---
         self.company_name = ft.TextField(
-            **config_tf_style, label="Nom de l'établissement *", 
+            **input_style, label="Nom de l'établissement *", 
             prefix_icon=ft.Icons.STORE_OUTLINED
         )
         self.slogan = ft.TextField(
-            **config_tf_style, label="Slogan de la boutique (optionnel)", 
+            **input_style, label="Slogan de la boutique (optionnel)", 
             prefix_icon=ft.Icons.CHAT_BUBBLE_OUTLINE_ROUNDED
         )
         self.contact = ft.TextField(
-            **config_tf_style, label="Numéro de téléphone *", 
+            **input_style, label="Numéro de téléphone *", 
             prefix_icon=ft.Icons.PHONE_OUTLINED,
             keyboard_type=ft.KeyboardType.PHONE
         )
         self.adresse = ft.TextField(
-            **config_tf_style, label="Adresse / Ville *", 
+            **input_style, label="Adresse / Ville *", 
             prefix_icon=ft.Icons.LOCATION_ON_OUTLINED
         )
         
@@ -57,15 +113,15 @@ class RegisterView(ft.View):
         
         # --- CHAMPS ÉTAPE 2 : Compte Administrateur ---
         self.admin_name = ft.TextField(
-            **config_tf_style, label="Votre nom complet *", 
+            **input_style, label="Votre nom complet *", 
             prefix_icon=ft.Icons.PERSON_PIN_OUTLINED
         )
         self.login = ft.TextField(
-            **config_tf_style, label="Adresse Email *", 
+            **input_style, label="Adresse Email *", 
             prefix_icon=ft.Icons.EMAIL_OUTLINED,
         )
         self.password = ft.TextField(
-            **config_tf_style, label="Mot de passe *", 
+            **input_style, label="Mot de passe *", 
             prefix_icon=ft.Icons.LOCK_OUTLINED,
             can_reveal_password=True, password=True
         )
@@ -87,7 +143,7 @@ class RegisterView(ft.View):
             alignment=ft.alignment.center,
             visible=False,
             content=ft.Container(
-                bgcolor="white",
+                bgcolor=SURFACE_COLOR,
                 padding=30,
                 border_radius=16,
                 width=300,
@@ -111,7 +167,16 @@ class RegisterView(ft.View):
 
         # Carte blanche principale du formulaire
         form_card = ft.Container(
-            bgcolor="white", border_radius=36, padding=40, width=450,
+            padding=40, width=450,
+            bgcolor="white",
+            border_radius=16,
+            border=ft.border.all(1, "#E2E8F0"), # Bordure Slate 200 très fine
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=4,
+                color=ft.Colors.with_opacity(0.04, "#000000"),
+                offset=ft.Offset(0, 2),
+            ),
             content=ft.Column(
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
@@ -150,12 +215,23 @@ class RegisterView(ft.View):
             )
         )
 
-        # Structure finale de la vue avec empilement du Loader
+        # --- STRUCTURE FINALE CENTRÉE AVEC LA BARRE DE NAVIGATION ---
         self.controls = [
             ft.Stack(
                 expand=True,
                 controls=[
-                    ft.Container(content=form_card, alignment=ft.alignment.center, expand=True),
+                    ft.Column(
+                        expand=True,
+                        spacing=0,
+                        controls=[
+                            top_bar,  # Barre fixée en haut
+                            ft.Container(
+                                # expand=True,
+                                alignment=ft.alignment.center,  # Centrage vertical et horizontal parfait
+                                content=form_card,
+                            )
+                        ]
+                    ),
                     self.loading_overlay
                 ]
             )
@@ -190,7 +266,7 @@ class RegisterView(ft.View):
                 ft.Container(
                     bgcolor=MAIN_COLOR, padding=10, height=45, border_radius=10,
                     alignment=ft.alignment.center,
-                    content=ft.Text("Suivant", size=16, font_family="PPM", color="white"),
+                    content=ft.Text("Suivant", size=16, font_family="PPM", color=SURFACE_COLOR),
                     on_click=self.go_to_admin_step
                 )
             ]
@@ -220,18 +296,18 @@ class RegisterView(ft.View):
                         ft.Container(
                             bgcolor=MAIN_COLOR, padding=10, height=45, border_radius=10, expand=True,
                             alignment=ft.alignment.center,
-                            content=ft.Text("Créer mon établissement", size=16, font_family="PPM", color="white"),
+                            content=ft.Text("Créer mon établissement", size=16, font_family="PPM", color=SURFACE_COLOR),
                             on_click=self.handle_registration
                         )
                     ],
                     spacing=10
                 )
             ]
-        self.page.update()
+        if self.page:
+            self.page.update()
 
     def go_to_admin_step(self, e):
         """ Valide l'étape 1 avant de basculer sur l'étape 2 """
-        # Réinitialisation des styles de bordure d'erreur
         self.company_name.border_color = None
         self.contact.border_color = None
         self.adresse.border_color = None
@@ -266,12 +342,10 @@ class RegisterView(ft.View):
 
     def handle_registration(self, e):
         """ Traitement final de l'inscription globale """
-        # Reset des bordures
         self.admin_name.border_color = None
         self.login.border_color = None
         self.password.border_color = None
 
-        # Validation stricte des données du compte admin
         if not self.admin_name.value or not self.login.value or not self.password.value:
             if not self.admin_name.value: self.admin_name.border_color = "red"
             if not self.login.value: self.login.border_color = "red"
@@ -284,17 +358,14 @@ class RegisterView(ft.View):
             self.show_error("Le mot de passe doit contenir au moins 6 caractères.")
             return
 
-        # Déclenchement du rideau d'attente plein écran
         self.error_text.visible = False
         self.loading_overlay.visible = True
         self.page.update() 
 
         try:
-            # Génération de l'identifiant unique de la structure
             new_tenant_id = str(uuid.uuid4())
             logo_url_final = None
 
-            # Traitement et upload du Logo si présent
             if self.selected_file_path and os.path.exists(self.selected_file_path):
                 _, ext = os.path.splitext(self.selected_file_path)
                 ext = ext.lower() if ext else ".png"
@@ -310,7 +381,6 @@ class RegisterView(ft.View):
                 res_url = supabase_client.storage.from_("logos").get_public_url(nom_fichier_storage)
                 logo_url_final = str(res_url)
 
-            # Inscription au niveau du module d'authentification Supabase
             auth_response = supabase_client.auth.sign_up(
                 {
                     "email": self.login.value,
@@ -326,14 +396,12 @@ class RegisterView(ft.View):
             )
 
             if auth_response.user:
-                # Sauvegarde immédiate dans l'espace de stockage Flet local
                 self.page.client_storage.set(ACCESS_TOKEN, auth_response.session.access_token)
                 self.page.client_storage.set(USER_ID, auth_response.user.id)
                 self.page.client_storage.set(USER_NAME, self.admin_name.value)
                 self.page.client_storage.set(TENANT_ID, new_tenant_id)
                 self.page.client_storage.set(ROLE, "admin")
 
-                # Insertion des données de l'établissement
                 supabase_client.table("tenants").insert(
                     {
                         "id": new_tenant_id,
@@ -345,7 +413,6 @@ class RegisterView(ft.View):
                     }
                 ).execute()
 
-                # Insertion du profil utilisateur lié
                 supabase_client.table("profiles").insert(
                     {
                         "id": auth_response.user.id,
@@ -357,7 +424,6 @@ class RegisterView(ft.View):
                     }
                 ).execute()
 
-                # Enregistrement automatisé du pack d'essai Freemium 1 Mois via la clé d'administration
                 try:
                     date_debut = datetime.date.today()
                     date_fin = date_debut + datetime.timedelta(days=30)
@@ -368,18 +434,18 @@ class RegisterView(ft.View):
                             "montant": 0,
                             "mode_paiement": "Système (Essai)",
                             "reference_transaction": f"TRIAL-{new_tenant_id[:8].upper()}",
-                            "statut": "reussi",
+                            "statut": "réussi",
                             "periode_couverte_debut": str(date_debut),
                             "periode_couverte_fin": str(date_fin),
                             "date_expiration": str(date_fin),
                             "plan_choisi": "Freemium 1 Mois"
                         }
                     ).execute()
-                    print(f"✨ Période d'essai de 30 jours initialisée pour le tenant {new_tenant_id}")
+                    self.page.client_storage.set(EXPIRATION_DATE, str(date_fin))
+
                 except Exception as e_paiement:
                     print(f"⚠️ [ERREUR INTERNE INSCRIPTION PAIEMENT] : {e_paiement}")
 
-                # Fin du chargement et basculement vers l'interface applicative
                 self.loading_overlay.visible = False
                 self.page.go("/home")
             else:
@@ -390,7 +456,6 @@ class RegisterView(ft.View):
             self.show_error(f"Une erreur est survenue lors de l'enregistrement : {str(error)}")
 
     def show_error(self, message: str):
-        """ Affiche l'erreur de manière visible, rafraîchit l'UI et désactive le rideau d'attente """
         self.error_text.value = message
         self.error_text.visible = True
         self.loading_overlay.visible = False

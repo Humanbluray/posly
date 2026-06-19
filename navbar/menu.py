@@ -1,26 +1,30 @@
 import flet as ft
 from navbar.item_menu import ItemMenu
-from utils import MAIN_COLOR, SECOND_COLOR, resource_path
+from utils import MAIN_COLOR, SECOND_COLOR, resource_path, TEXT_PRIMARY, TEXT_SECONDARY, BORDER_COLOR
 from views.sections.sales import Sales
 from views.sections.reports import Reports
 from views.sections.users import Users
 from views.sections.settings import Settings
 from views.sections.produits import Products
+from views.sections.board import Board
+from views.sections.inventory import Inventory
+from views.sections.entries import Entries
+from views.sections.billing import BillingSection
 from utils import ROLE
 
 
 roles = {
     "admin": {
-        "Board": True, "Ventes": True, "Rapports": True, "Inventaires": True, "Produits": True,
-        "Paramètres": True, 'Entrées': True, "Utilisateurs": True 
+        "Board": True, "Ventes": False, "Rapports": True, "Inventaires": True, "Produits": True,
+        "Paramètres": True, 'Entrées': True, "Utilisateurs": True , "Facturation": True
     },
     "cashier": {
         "Board": False, "Ventes": True, "Rapports": True, "Inventaires": True, "Produits": True,
-        "Paramètres": False, 'Entrées': True, "Utilisateurs": False 
+        "Paramètres": False, 'Entrées': True, "Utilisateurs": False, "Facturation": False
     },
     "manager": {
         "Board": True, "Ventes": True, "Rapports": True, "Inventaires": True, "Produits": True,
-        "Paramètres": True, 'Entrées': True, "Utilisateurs": False 
+        "Paramètres": True, 'Entrées': True, "Utilisateurs": False, "Facturation": False
     },
 }
 
@@ -36,7 +40,7 @@ class NavBar(ft.Column):
 
         # items ____________________________________________________________________________
         self.dashboard = ItemMenu(
-            "Board", "assets/icons/grey/layout-dashboard.svg", "assets/icons/black/layout-dashboard.svg",
+            "Tableau de bord", "assets/icons/grey/layout-dashboard.svg", "assets/icons/black/layout-dashboard.svg",
             roles[self.role]['Board']
         )
         self.sales = ItemMenu(
@@ -67,9 +71,14 @@ class NavBar(ft.Column):
             "Utilisateurs", "assets/icons/grey/users.svg", "assets/icons/black/users.svg",
             roles[self.role]['Utilisateurs']
         )
+        self.billing = ItemMenu(
+            "Facturation", "assets/icons/grey/credit-card.svg", "assets/icons/black/credit-card.svg",
+            roles[self.role]['Facturation']
+        )
 
         self.children = [
-            self.dashboard, self.sales, self.reports, self.products, self.inventory, self.entries, self.settings, self.users
+            self.dashboard, self.sales, self.reports, self.products, self.inventory, self.entries, self.settings, self.users,
+            self.billing
         ]
 
         for child in self.children:
@@ -77,45 +86,52 @@ class NavBar(ft.Column):
 
         self.controls = [
             ft.Column(
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                expand=True,
                 controls=[
                     ft.Column(
                         controls=[
                             ft.Row(
                                 controls=[
-                                    ft.Image(src="assets/icons/black/chart-line.svg", width=24, height=24),
+                                    ft.Icon(ft.Icons.CHAIR_ALT_OUTLINED, size=28, color=MAIN_COLOR),
                                     ft.Row(
                                         controls=[
-                                            ft.Text("Pos", size=24, font_family="PEB"),
-                                            ft.Text("ly", size=24, font_family="PEB", color=MAIN_COLOR),
-                                        ], spacing=0
+                                            ft.Text("Pos", size=26, font_family="PEB", color=TEXT_PRIMARY),
+                                            ft.Text("ly", size=26, font_family="PEB", color=MAIN_COLOR),
+                                        ],
+                                        spacing=0
                                     )
-                                ], spacing=5,
+                                ],
+                                spacing=8,
                                 alignment=ft.MainAxisAlignment.CENTER
                             ),
-                            ft.Divider(height=20, thickness=1),
+                            ft.Divider(height=20, color=BORDER_COLOR),
                             ft.Column(
                                 controls=[
-                                    ft.Text(
-                                        "Principal", size=13, font_family="PPM", color="grey"
-                                    ),
+                                    ft.Text("Principal", size=12, font_family="PPM", color=TEXT_SECONDARY, weight=ft.FontWeight.W_600),
                                     self.dashboard, self.sales, self.reports, self.products, self.inventory, self.entries,
-                                ], spacing=10
+                                ],
+                                spacing=12
                             )
                         ]
                     ),
                     ft.Column(
                         controls=[
                             ft.Text(
-                                "Administration", size=13, font_family="PPM", color="grey",
+                                "Administration",
+                                size=12,
+                                font_family="PPM",
+                                color=TEXT_SECONDARY,
+                                weight=ft.FontWeight.W_600,
                                 visible=roles[self.role]['Utilisateurs']
                             ),
+                            self.billing,
                             self.users, self.settings,
-                        ], spacing=10
+                        ],
+                        spacing=12
                     )
                 ]
             )
-            
         ]
         self.load()
 
@@ -126,6 +142,8 @@ class NavBar(ft.Column):
 
         if self.role != "cashier":
             self.dashboard.set_is_clicked_true()
+            self.cp.my_content.controls.clear()
+            self.cp.my_content.controls.append(Board(self.cp))
         
         else:
             self.sales.set_is_clicked_true()
@@ -163,6 +181,18 @@ class NavBar(ft.Column):
         
         elif e.control.name.value.lower() == "produits".lower():
             self.cp.my_content.controls.append(Products(self.cp))
+        
+        elif e.control.name.value.lower() == "inventaires".lower():
+            self.cp.my_content.controls.append(Inventory(self.cp))
+        
+        elif e.control.name.value.lower() == "tableau de bord".lower():
+            self.cp.my_content.controls.append(Board(self.cp))
+        
+        elif e.control.name.value.lower() == "entrées".lower():
+            self.cp.my_content.controls.append(Entries(self.cp))
+
+        elif e.control.name.value.lower() == "facturation".lower():
+            self.cp.my_content.controls.append(BillingSection(self.cp))
             
         else:
             print("ok")

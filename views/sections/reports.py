@@ -3,9 +3,9 @@ from components.components import MyButton
 from utils import (
     ACCESS_TOKEN, ROLE, USER_ID, TENANT_ID, USER_NAME, PLAN_CHOISI, EXPIRATION_DATE, EXPIRATION_DATE, TENANT_NAME,
     TENANT_ID, USER_EMAIL, format_milliers_fr, BG_COLOR,
-    resource_path, MAIN_COLOR, convert_date_to_string, create_objet_date
+    resource_path, MAIN_COLOR, convert_date_to_string, create_objet_date,
+    TEXT_PRIMARY, TEXT_SECONDARY, SHADOW_COLOR, BORDER_COLOR, CARD_BG
 )
-from styles import input_style, drop_style, login_style, datatable_style, config_tf_style
 import datetime, asyncio, threading
 from services.async_function import supabase_request_async
 import os
@@ -14,6 +14,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from datetime import datetime, date, timedelta
+from styles import config_tf_style, drop_style, datatable_style, stat_style
 
 
 class Reports(ft.Container):
@@ -37,21 +38,21 @@ class Reports(ft.Container):
         self.remove_button = ft.Container(
             height=20, width=30, alignment=ft.alignment.center,
             border_radius=ft.border_radius.only(bottom_right=4, bottom_left=4),
-            bgcolor="#f0f0f6",
+            bgcolor="white", border=ft.border.all(1, '#f0f0f6'),
             content=ft.Text("-", size=14, font_family="PPM"),
             on_click=self.remove
         )
         self.add_button = ft.Container(
             height=20, width=30, alignment=ft.alignment.center,
             border_radius=ft.border_radius.only(top_right=4, top_left=4),
-            bgcolor="#f0f0f6",
+            bgcolor="white", border=ft.border.all(1, '#f0f0f6'),
             content=ft.Text("+", size=14, font_family="PPM"),
             on_click=self.add,
         )
         self.changing_day = ft.Text(str(convert_date_to_string(date.today())), size=14, font_family="PPM")
         self.periode_chip = ft.Container(
             height=40, border_radius=2, padding=5, alignment=ft.alignment.center,
-            bgcolor="#f0f0f6", width=100,
+            bgcolor="white", border=ft.border.all(1, '#f0f0f6'),width=100,
             content=ft.Row(
                 controls=[self.changing_day],
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -61,7 +62,7 @@ class Reports(ft.Container):
         self.first_title = ft.Text("", size=14, font_family="PPM", color="grey")
         self.first_amount = ft.Text("0", size=18, font_family="PEB")
         self.first_container = ft.Container(
-            border_radius=8, bgcolor=ft.Colors.GREY_50, border=ft.border.all(1, BG_COLOR), padding=10, width=270,
+            **stat_style, width=285,
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -70,20 +71,22 @@ class Reports(ft.Container):
                             self.first_title,
                             ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=18, height=18)
                         ]
-                    ),ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
+                    ),
+                    ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
                     ft.Row(
                         controls=[
                             self.first_amount,
-                            ft.Text("XAF", size=14, font_family="PPM", color="grey")
+                            ft.Text("XAF", size=14, font_family="PPM", color=TEXT_SECONDARY)
                         ]
                     ),
                 ]
             )
         )
+        
         self.second_title = ft.Text("", size=14, font_family="PPM", color="grey")
         self.second_amount = ft.Text("0", size=18, font_family="PEB")
         self.second_container = ft.Container(
-            border_radius=8, bgcolor=ft.Colors.GREY_50, border=ft.border.all(1, BG_COLOR), padding=10, width=270,
+            **stat_style, width=285,
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -92,16 +95,19 @@ class Reports(ft.Container):
                             self.second_title,
                             ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=18, height=18)
                         ]
-                    ), ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
+                    ),
+                    ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
                     ft.Row(
                         controls=[
                             self.second_amount,
-                            ft.Text("XAF", size=14, font_family="PPM", color="grey")
+                            ft.Text("XAF", size=14, font_family="PPM", color=TEXT_SECONDARY)
                         ]
                     ),
                 ]
             )
         )
+        
+        
         self.prog_title = ft.Text("", size=14, font_family="PPM", color="grey")
         self.prog_amount = ft.Text("0", size=18, font_family="PEB")
         self.prog_icon = ft.Image(
@@ -109,8 +115,9 @@ class Reports(ft.Container):
             width=16, height=16
         )
         self.prog_percent = ft.Text(size=12, font_family="PPM")
+        
         self.prog_container = ft.Container(
-            border_radius=8, bgcolor=ft.Colors.GREY_50, border=ft.border.all(1, BG_COLOR), padding=10, width=270,
+            **stat_style, width=285,
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -119,13 +126,14 @@ class Reports(ft.Container):
                             self.prog_title,
                             ft.Image(resource_path("assets/icons/grey/chart-spline.svg"), width=18, height=18)
                         ]
-                    ), ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
+                    ),
+                    ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
                     ft.Row(
                         controls=[
                             ft.Row([self.prog_amount, ft.Text("XAF", size=14, font_family="PPM", color="grey")]),
                             ft.Row([self.prog_percent, self.prog_icon])
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                    )
+                    ),
                 ]
             )
         )
@@ -221,19 +229,16 @@ class Reports(ft.Container):
         )
                
         self.main_layout = ft.Container(
-            expand=True,
-            # border=ft.border.all(1, "#f0f0f6"), border_radius=8,
-            padding=20,
+            **stat_style,
             content=ft.Column(
                 expand=True,
                 controls=[
-                    ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
+                    # ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
                     ft.Column(
                         expand=True,
                         controls=[
                             ft.Container(
-                                border=ft.border.all(1, "#f0f0f6"), border_radius=10, expand=True,
-                                bgcolor="white",
+                                expand=True,
                                 padding=20, content=ft.Column(
                                     expand=True,
                                     controls=[
@@ -314,13 +319,13 @@ class Reports(ft.Container):
                 ),
                 ft.Divider(height=5, thickness=1),
                 ft.Container(
-                    padding=20, bgcolor="white", expand=True,
+                    **stat_style, expand=True,
                     content=ft.Column(
                         controls=[
                                 ft.ListView(expand=True, controls=[self.dt_table]),
                                 ft.Divider(height=5, thickness=1),
                                 ft.Container(
-                                    bgcolor=BG_COLOR, padding=10, border_radius=6,
+                                    **stat_style,
                                     content=ft.Row(
                                     controls=[
                                         ft.Column(
@@ -415,11 +420,11 @@ class Reports(ft.Container):
         self.report_solde_awaited = ft.Text("-", size=18, font_family="PEB", color="red")
         self.report_cash = ft.Text("", size=18, font_family="PEB", color="brown")
         self.report_solde_reel = ft.TextField(
-            **input_style, width=150, input_filter=ft.NumbersOnlyInputFilter(), label="Solde réel",
+            **config_tf_style, width=150, input_filter=ft.NumbersOnlyInputFilter(), label="Solde réel",
             text_align=ft.TextAlign.RIGHT
         )
         self.report_versement = ft.TextField(
-            **input_style, width=170, input_filter=ft.NumbersOnlyInputFilter(), text_align=ft.TextAlign.RIGHT,
+            **config_tf_style, width=170, input_filter=ft.NumbersOnlyInputFilter(), text_align=ft.TextAlign.RIGHT,
             label="Montant versement", value="0"
         )
         self.table_des_ventes: list = []
