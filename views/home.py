@@ -1,12 +1,13 @@
 import flet as ft
 from navbar.menu import NavBar
-from styles import ct_style, intern_ct_style, login_style
+from styles import ct_style, intern_ct_style, input_style
 from components.components import StateButton, MyButton
-import os
+import os, time
 from datetime import date
 from utils import (
     ACCESS_TOKEN, TENANT_ID, USER_ID, USER_NAME, TENANT_NAME, EXPIRATION_DATE, 
-    ROLE, PLAN_CHOISI, resource_path, RED_COLOR, GREEN_COLOR, MAIN_COLOR, USER_EMAIL, BG_COLOR, IS_FIRST_LOGIN
+    ROLE, PLAN_CHOISI, resource_path, MAIN_COLOR, USER_EMAIL, BG_COLOR, IS_FIRST_LOGIN,
+    SHADOW_COLOR, BORDER_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, CARD_BG
 )
 from services.supabase_client import supabase_client
 
@@ -40,63 +41,54 @@ class HomeView(ft.View):
         self.icone_abo = ft.Image("", width=16, height=16)
         self.abo = ft.Text(self.expiration_date, size=13, font_family="PPM", weight=ft.FontWeight.W_600)
         self.ct_abo = ft.Container(
-            padding=ft.padding.symmetric(horizontal=12, vertical=6), 
-            border_radius=8, 
-            border=ft.border.all(1, ft.Colors.TRANSPARENT), 
+            padding=ft.padding.symmetric(horizontal=12, vertical=6),
+            border_radius=8,
+            border=ft.border.all(1, ft.Colors.TRANSPARENT),
+            bgcolor=ft.Colors.with_opacity(0.1, MAIN_COLOR),
             content=ft.Row(
                 controls=[self.icone_abo, self.abo],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=6,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER
             )
         )
-        
         # contenu de la section principale
         self.my_content = ft.Column(
             expand=True,
             controls=[
-                ft.Text(
-                    f"Bienvenue, {self.user_name}", size=18, font_family="PEB"
-                )
+                
             ]
         )
         
-        # --- AMÉLIORATION DU CONTENEUR DU TENANT ---
+        # --- EN-TÊTE MODERNE ---
         self.top_container = ft.Container(
-            padding=ft.padding.symmetric(horizontal=20, vertical=10),
-            bgcolor="white",
+            padding=ft.padding.symmetric(horizontal=24, vertical=12),
+            bgcolor=CARD_BG,
+            # shadow=ft.BoxShadow(blur_radius=8, color=SHADOW_COLOR, spread_radius=1),
             content=ft.Row(
                 controls=[
                     ft.Row(
                         controls=[
                             ft.Container(
-                                bgcolor="#F8F9FA", 
-                                padding=ft.padding.symmetric(horizontal=14, vertical=6), 
-                                border_radius=8,
-                                border=ft.border.all(1, "#E9ECEF"),
-                                alignment=ft.alignment.center,
+                                bgcolor=BG_COLOR,
+                                padding=ft.padding.symmetric(horizontal=14, vertical=8),
+                                border_radius=10,
+                                border=ft.border.all(1, BORDER_COLOR),
                                 content=ft.Row(
                                     controls=[
-                                        ft.Image(
-                                            resource_path("assets/icons/grey/store.svg"),
-                                            width=16, height=16,
-                                            color=MAIN_COLOR 
-                                        ),
+                                        ft.Icon(ft.Icons.STORE_OUTLINED, size=16, color=MAIN_COLOR),
                                         ft.Text(
-                                            self.tenant_name.upper() if self.tenant_name else "", 
-                                            size=13, 
-                                            font_family="PEB", 
-                                            color="#495057"
+                                            self.tenant_name.upper() if self.tenant_name else "",
+                                            size=14,
+                                            font_family="PEB",
+                                            color=TEXT_PRIMARY,
                                         )
                                     ],
                                     spacing=8,
-                                    vertical_alignment=ft.CrossAxisAlignment.CENTER
                                 )
                             ),
                             self.ct_abo
                         ],
                         spacing=12,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER
                     ),
                     ft.Row(
                         controls=[
@@ -106,7 +98,7 @@ class HomeView(ft.View):
                             ),
                             StateButton(
                                 icon=resource_path("assets/icons/black/user.svg"),
-                                badge=None, data=None, 
+                                badge=None, data=None,
                                 click=lambda e: self.show_container(self.data_container)
                             )
                         ],
@@ -114,13 +106,12 @@ class HomeView(ft.View):
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER
             ),
         )
         
         # Sidebar
         self.left_container = ft.Container(
-            width=215, bgcolor="white", border=ft.border.only(
+            width=230, bgcolor="white", border=ft.border.only(
                 right=ft.BorderSide(1, "#f0f0f6")
             ),
             padding=20, 
@@ -149,106 +140,97 @@ class HomeView(ft.View):
         # --- ENSEMBLE PRO : REFONTE COMPLÈTE DE SELF.DATA_CONTAINER ---
         # =====================================================================
         self.data_container = ft.Container(
-            **ct_style, 
+            **ct_style,
             content=ft.Container(
-                **intern_ct_style, 
-                width=380, 
-                height=420,  # Légèrement augmenté pour aérer l'avatar et les infos
+                **intern_ct_style,
+                width=400,
+                height=450,
                 content=ft.Container(
-                    padding=24,
+                    padding=30,
                     content=ft.Column(
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         spacing=0,
                         controls=[
-                            # Entête du modal avec bouton de fermeture discret
+                            # Entête
                             ft.Row(
                                 controls=[
-                                    ft.Text("Mon Profil", size=18, font_family="PEB", color="#6C757D"),
-                                    StateButton(
-                                        icon=resource_path("assets/icons/black/x.svg"),
-                                        badge=None, data=None,
-                                        click=lambda e: self.hide_container(self.data_container)
+                                    ft.Text("Mon Profil", size=20, font_family="PEB", color=TEXT_PRIMARY),
+                                    ft.IconButton(
+                                        icon=ft.Icons.CLOSE_ROUNDED,
+                                        icon_color=TEXT_SECONDARY,
+                                        on_click=lambda e: self.hide_container(self.data_container)
                                     )
-                                ], 
+                                ],
                                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                             ),
-                            ft.Divider(height=15, thickness=1, color="#F1F3F5"),
-                            
-                            # Zone d'Avatar Moderne
+                            ft.Divider(height=15, color=BORDER_COLOR),
+                            # Avatar avec dégradé
                             ft.Container(
-                                width=64, height=64,
-                                bgcolor=ft.Colors.with_opacity(0.1, MAIN_COLOR),
-                                border_radius=32,
+                                width=80,
+                                height=80,
+                                bgcolor=ft.Colors.with_opacity(0.15, MAIN_COLOR),
+                                border_radius=40,
                                 alignment=ft.alignment.center,
                                 margin=ft.margin.only(top=10, bottom=8),
                                 content=ft.Text(
                                     initiales,
-                                    size=22,
+                                    size=28,
                                     font_family="PEB",
-                                    color=MAIN_COLOR
+                                    color=MAIN_COLOR,
                                 )
                             ),
-                            
-                            # Nom d'utilisateur principal
                             ft.Text(
                                 self.user_name,
-                                size=18,
+                                size=20,
                                 font_family="PEB",
-                                color="#212529",
-                                text_align=ft.TextAlign.CENTER
+                                color=TEXT_PRIMARY,
                             ),
-                            
-                            # Badge de Rôle Dynamique
                             ft.Container(
-                                padding=ft.padding.symmetric(horizontal=10, vertical=4),
-                                bgcolor="#E8F4FD" if self.role.lower() == "admin" else "#F1F3F5",
+                                padding=ft.padding.symmetric(horizontal=12, vertical=4),
+                                bgcolor=ft.Colors.with_opacity(0.1, MAIN_COLOR),
                                 border_radius=6,
                                 margin=ft.margin.only(top=4, bottom=20),
                                 content=ft.Text(
                                     self.role.upper(),
-                                    size=11,
+                                    size=12,
                                     font_family="PPM",
                                     weight=ft.FontWeight.BOLD,
-                                    color="#1A73E8" if self.role.lower() == "admin" else "#495057"
+                                    color=MAIN_COLOR,
                                 )
                             ),
-                            
-                            # Bloc d'informations épuré (Lignes d'infos style List Tile)
+                            # Infos
                             ft.Container(
-                                bgcolor="#F8F9FA",
-                                border_radius=10,
-                                padding=14,
+                                bgcolor=BG_COLOR,
+                                border_radius=12,
+                                padding=16,
                                 margin=ft.margin.only(bottom=24),
                                 content=ft.Column(
                                     spacing=12,
                                     controls=[
-                                        # Ligne Email
                                         ft.Row(
                                             controls=[
-                                                ft.Image(resource_path("assets/icons/black/mail.svg"), width=16, height=16, color="#6C757D") if os.path.exists(resource_path("assets/icons/black/mail.svg")) else ft.Icon(ft.Icons.EMAIL_OUTLINED, size=16, color="#6C757D"),
-                                                ft.Text(self.user_email, size=13, font_family="PPM", color="#495057", overflow=ft.TextOverflow.ELLIPSIS)
+                                                ft.Icon(ft.Icons.EMAIL_OUTLINED, size=18, color=TEXT_SECONDARY),
+                                                ft.Text(self.user_email, size=14, font_family="PPM", color=TEXT_PRIMARY),
                                             ],
-                                            spacing=10
+                                            spacing=10,
                                         ),
-                                        # Ligne ID Établissement (Tenant Name)
                                         ft.Row(
                                             controls=[
-                                                ft.Image(resource_path("assets/icons/black/building.svg"), width=16, height=16, color="#6C757D") if os.path.exists(resource_path("assets/icons/black/building.svg")) else ft.Icon(ft.Icons.BUSINESS_OUTLINED, size=16, color="#6C757D"),
-                                                ft.Text(self.tenant_name if self.tenant_name else "Aucun établissement", size=13, font_family="PPM", color="#495057")
+                                                ft.Icon(ft.Icons.BUSINESS_OUTLINED, size=18, color=TEXT_SECONDARY),
+                                                ft.Text(self.tenant_name or "Aucun établissement", size=14, font_family="PPM", color=TEXT_PRIMARY),
                                             ],
-                                            spacing=10
+                                            spacing=10,
                                         ),
                                     ]
                                 )
                             ),
-                            
-                            # Bouton de déconnexion stylisé
+                            # Bouton déconnexion
                             ft.Container(
                                 width=float("inf"),
                                 content=MyButton(
                                     icon=resource_path('assets/icons/white/circle-x.svg'),
                                     title="Se déconnecter",
-                                    click=None,  # Relie ta fonction de déconnexion ici
+                                    click=self.deconnexion,
                                 )
                             )
                         ]
@@ -332,7 +314,7 @@ class HomeView(ft.View):
     def _init_password_reset_modal(self):
         """Crée et affiche de force la boîte de dialogue de configuration de mot de passe."""
         self.new_password_tf = ft.TextField(
-            **login_style,
+            **input_style,
             label="Nouveau mot de passe",
             password=True,
             can_reveal_password=True,
@@ -340,7 +322,7 @@ class HomeView(ft.View):
         )
         
         self.confirm_password_tf = ft.TextField(
-            **login_style,
+            **input_style,
             label="Confirmer le mot de passe",
             password=True,
             can_reveal_password=True,
@@ -473,14 +455,14 @@ class HomeView(ft.View):
             self.ct_abo.bgcolor = ft.Colors.with_opacity(0.08, ft.Colors.RED)
             self.ct_abo.border = ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.RED))
 
-        elif 1 <= delay <= 30: 
+        elif 1 <= delay <= 31:
             self.icone_abo.src = resource_path("assets/icons/others/calendar-heart-red.svg")
             self.abo.value = f"Expire dans {delay} jrs"
             self.abo.color = ft.Colors.RED_700
             self.ct_abo.bgcolor = ft.Colors.with_opacity(0.08, ft.Colors.RED)
             self.ct_abo.border = ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.RED))
 
-        elif 30 < delay <= 60: 
+        elif 31 < delay <= 60:
             self.icone_abo.src = resource_path("assets/icons/others/calendar-fold.svg")
             self.abo.value = f"Expire dans {delay} jrs"
             self.abo.color = ft.Colors.AMBER_700
@@ -522,7 +504,7 @@ class HomeView(ft.View):
         print("[DEBUG STORAGE] Stockage local nettoyé avec succès.")
 
         # 3. Notification visuelle de succès
-        self.show_alert("Déconnexion réussie. À bientôt !", ft.Icons.CHECK_CIRCLE_ROUNDED, GREEN_COLOR)
+        self.show_alert("Déconnexion réussie. À bientôt !", ft.Icons.CHECK_CIRCLE, ft.Colors.LIGHT_GREEN)
         
         # Un léger délai pour laisser le SnackBar s'afficher avant la redirection
         time.sleep(0.5)

@@ -1,7 +1,8 @@
 import flet as ft
-from styles import drop_style, config_tf_style, login_style, switch_style
+from styles import drop_style, config_tf_style, login_style, switch_style, stat_style
 from components.components import CardItem, StyledButton, FilterItem, MyButton
-from utils import ACCESS_TOKEN, USER_ID, TENANT_ID, USER_NAME, ROLE, MAIN_COLOR, format_milliers_fr, resource_path, BG_COLOR
+from utils import ACCESS_TOKEN, USER_ID, TENANT_ID, USER_NAME, ROLE, MAIN_COLOR, format_milliers_fr, resource_path, \
+    BG_COLOR
 import asyncio, threading, time, datetime, os, webbrowser
 from services.async_function import supabase_request_async
 from services.supabase_client import supabase_client, supabase_admin
@@ -14,13 +15,12 @@ from reportlab.pdfbase.ttfonts import TTFont
 import requests
 
 
-
 class Sales(ft.Container):
     def __init__(self, cp: object):
         super().__init__(expand=True)
         self.cp = cp
 
-        #paramètres généraux
+        # paramètres généraux
         self.access_token = self.cp.page.client_storage.get(ACCESS_TOKEN)
         self.role = self.cp.page.client_storage.get(ROLE)
         self.user_id = self.cp.page.client_storage.get(USER_ID)
@@ -89,11 +89,11 @@ class Sales(ft.Container):
                                         ),
                                         self.search_field
                                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                ), 
+                                ),
                                 self.row_filter_categories,
                             ]
                         ),
-                        bgcolor="white", padding=ft.padding.only(20, 10, 20, 10), border_radius=10,
+                        **stat_style
                     ),
                     ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
                     ft.Stack(
@@ -143,7 +143,7 @@ class Sales(ft.Container):
             text_align=ft.TextAlign.RIGHT, disabled=True, value="1"
         )
         self.right_container = ft.Container(
-            width=300, bgcolor="white", border_radius=16, padding=ft.padding.only(20, 10, 20, 10),
+            **stat_style, width=300,
             content=ft.Column(
                 controls=[
                     ft.Column(
@@ -223,7 +223,7 @@ class Sales(ft.Container):
                 expand=True,
                 controls=[
                     self.left_container,
-                    ft.VerticalDivider(width=1, color= ft.Colors.TRANSPARENT),
+                    ft.VerticalDivider(width=1, color=ft.Colors.TRANSPARENT),
                     self.right_container,
                 ], spacing=10
             )
@@ -233,6 +233,7 @@ class Sales(ft.Container):
     @staticmethod
     def run_async_in_thread(coro):
         """Exécute une coroutine asynchrone dans un thread séparé"""
+
         def runner():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -270,7 +271,8 @@ class Sales(ft.Container):
         print("categories uniques", categories_uniques)
 
         for category in categories_uniques:
-            self.row_filter_categories.controls.append(FilterItem(self, category, False, self.row_filter_categories.controls))
+            self.row_filter_categories.controls.append(
+                FilterItem(self, category, False, self.row_filter_categories.controls))
 
         self.cp.page.update()
 
@@ -286,7 +288,7 @@ class Sales(ft.Container):
         params = {
             'select': "*",
         }
-        
+
         try:
             produits = await supabase_request_async(
                 access_token=self.access_token,
@@ -338,7 +340,7 @@ class Sales(ft.Container):
         # CHARGEMENT PAR LOTS (Optimisation UI pour l'affichage des cartes)
         batch_size = 20
         for i in range(0, len(filtered_list), batch_size):
-            batch = self.filtered_list[i : i + batch_size]
+            batch = self.filtered_list[i: i + batch_size]
             for product in batch:
                 self.grid.controls.append(CardItem(self, product, self.basket))
 
@@ -348,7 +350,7 @@ class Sales(ft.Container):
 
         # Rafraîchissement final de sécurité
         self.cp.page.update()
-        
+
     def filter_data_by_typing(self, e):
         # 1. On récupère la valeur en minuscule pour la comparaison
         val_cherchee = self.search_field.value.lower().strip() if self.search_field.value else ""
@@ -368,8 +370,8 @@ class Sales(ft.Container):
 
             return name_match and category_match
 
-        filtered_list = list(filter(match_criteria, self.filtered_list)) # Utilise self.all_products ici !
-        
+        filtered_list = list(filter(match_criteria, self.filtered_list))  # Utilise self.all_products ici !
+
         # Si le tenant n'a aucun produit dans sa base
         if not filtered_list:
             self.nb_products.value = "0"
@@ -382,13 +384,13 @@ class Sales(ft.Container):
         # 3. Affichage
         batch_size = 20
         for i in range(0, len(filtered_list), batch_size):
-            batch = filtered_list[i : i + batch_size]
+            batch = filtered_list[i: i + batch_size]
             for product in batch:
                 self.grid.controls.append(CardItem(self, product, self.basket))
             self.cp.page.update()
             time.sleep(0.05)
 
-        self.cp.page.update() # Rafraîchissement final
+        self.cp.page.update()  # Rafraîchissement final
 
     def changing_payment(self, e):
         if self.payment_mode.value == "Cash":
@@ -403,7 +405,7 @@ class Sales(ft.Container):
     def on_blur_espece(self, e):
         self.due.value = int(self.espece.value) - int(self.amount.value)
         self.cp.page.update()
-       
+
     def open_valid_basket_container(self, e):
         # on vide les précédents élements...
         self.cp.valid_basket_form.content = None
@@ -421,7 +423,7 @@ class Sales(ft.Container):
                 )
             )
 
-        self.cp.valid_basket_form.content = content=ft.Column(
+        self.cp.valid_basket_form.content = content = ft.Column(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True,
             controls=[
                 ft.Column(
@@ -534,20 +536,20 @@ class Sales(ft.Container):
         # 2. Récupération préalable des configurations de la boutique (tenant)
         tenant_infos = {}
         try:
-            reponse = supabase_client.table("tenants")\
-                .select("nom_entreprise, slogan, logo_url, contact, adresse")\
-                .eq("id", self.tenant_id)\
+            reponse = supabase_client.table("tenants") \
+                .select("nom_entreprise, slogan, logo_url, contact, adresse") \
+                .eq("id", self.tenant_id) \
                 .execute()
-            
+
             if reponse.data and len(reponse.data) > 0:
                 tenant_infos = reponse.data[0]
-                
+
         except Exception as e_tenant:
             print(f"Avis: Échec de la récupération synchrone des détails du tenant ({e_tenant})")
 
         # 3. Préparation des données d'articles
         datas_details = []
-        
+
         for item in self.basket.controls:
             d = item.datas_item
             quantite = int(d['qty'])
@@ -601,7 +603,7 @@ class Sales(ft.Container):
                 rendu=argent_rendu,
                 tenant_infos=tenant_infos
             )
-            
+
             if url_ticket:
                 self.ouvrir_et_imprimer_ticket(url_ticket)
 
@@ -620,7 +622,7 @@ class Sales(ft.Container):
             self.cp.show_alert(
                 "Achat validé & Ticket imprimé", ft.Icons.CHECK_CIRCLE, ft.Colors.LIGHT_GREEN_400
             )
-            
+
             self.run_async_in_thread(self.load_datas())
 
         except Exception as err:
@@ -631,14 +633,14 @@ class Sales(ft.Container):
         """Charge la police Inter depuis les fichiers TTF locaux."""
         nom_police = "Inter"
         nom_police_bold = "Inter-Bold"
-        
+
         if nom_police in pdfmetrics.getRegisteredFontNames():
             return nom_police, nom_police_bold
 
         try:
             chemin_regular = resource_path("assets/fonts/Inter-Regular.ttf")
             chemin_bold = resource_path("assets/fonts/Inter-Bold.ttf")
-            
+
             if os.path.exists(chemin_regular) and os.path.exists(chemin_bold):
                 pdfmetrics.registerFont(TTFont(nom_police, chemin_regular))
                 pdfmetrics.registerFont(TTFont(nom_police_bold, chemin_bold))
@@ -656,7 +658,7 @@ class Sales(ft.Container):
         les coupures sauvages et les sauts de page sur les imprimantes thermiques.
         """
         font_reg, font_bold = self.charger_police_inter()
-        
+
         # Récupération des données passées en kwargs
         date_heure = kwargs.get('date_heure', datetime.datetime.now().strftime("%d/%m/%Y %H:%M"))
         self_user_name = kwargs.get('self_user_name', self.user_name if hasattr(self, 'user_name') else "Caissier")
@@ -665,7 +667,7 @@ class Sales(ft.Container):
         encaisse = kwargs.get('encaisse', 0)
         rendu = kwargs.get('rendu', 0)
         items = kwargs.get('items', kwargs.get('articles', []))
-        
+
         tenant_infos = kwargs.get('tenant_infos', {})
         if isinstance(tenant_infos, dict):
             nom_boutique = tenant_infos.get('nom_entreprise', kwargs.get('nom_boutique', 'Ma Boutique'))
@@ -682,23 +684,23 @@ class Sales(ft.Container):
 
         # --- CONFIGURATION IMPRIMANTE THERMIQUE STABLE ---
         largeur_ticket = 80 * mm
-        
+
         # On définit une hauteur fixe standard et confortable pour un ticket de caisse de supermarché / boutique.
         # Cela évite que le pilote de l'imprimante ne panique avec des tailles de pages exotiques.
-        hauteur_ticket = 280 * mm  
-        
+        hauteur_ticket = 280 * mm
+
         chemin_pdf = "ticket_temp.pdf"
         c = canvas.Canvas(chemin_pdf, pagesize=(largeur_ticket, hauteur_ticket))
-        
+
         # Définition de la CropBox pour guider le pilote d'impression
         c.setCropBox((0, 0, largeur_ticket, hauteur_ticket))
-        
+
         # Positionnement de départ du curseur (en haut du rouleau)
         y_cursor = hauteur_ticket - 8 * mm
         M_LEFT = 4 * mm
         M_RIGHT = largeur_ticket - 4 * mm
         C_CENTER = largeur_ticket / 2
-        
+
         # --- SECTION EN-TÊTE & LOGO ---
         if logo_url:
             try:
@@ -706,21 +708,22 @@ class Sales(ft.Container):
                 if response.status_code == 200:
                     img_data = BytesIO(response.content)
                     img = ImageReader(img_data)
-                    c.drawImage(img, C_CENTER - (19 * mm), y_cursor - (14 * mm), width=38 * mm, height=14 * mm, preserveAspectRatio=True)
+                    c.drawImage(img, C_CENTER - (19 * mm), y_cursor - (14 * mm), width=38 * mm, height=14 * mm,
+                                preserveAspectRatio=True)
                     y_cursor -= 16 * mm
             except Exception as e:
                 print(f"[REPORTLAB] Erreur logo : {e}")
-                
+
         c.setFont(font_bold, 12)
         c.drawCentredString(C_CENTER, y_cursor, nom_boutique)
         y_cursor -= 5 * mm
-        
+
         c.setFont(font_reg, 8.5)
         c.setFillColorRGB(0.3, 0.3, 0.3)
         c.drawCentredString(C_CENTER, y_cursor, slogan)
         c.setFillColorRGB(0, 0, 0)
         y_cursor -= 6 * mm
-        
+
         # --- SECTION INFOS DU TICKET ---
         c.setFont(font_reg, 8.5)
         c.drawString(M_LEFT, y_cursor, f"Ticket N° : {facture_id}")
@@ -729,24 +732,24 @@ class Sales(ft.Container):
         y_cursor -= 4 * mm
         c.drawString(M_LEFT, y_cursor, f"Caissier(e) : {self_user_name}")
         y_cursor -= 5 * mm
-        
+
         # Ligne de séparation
         c.setStrokeColorRGB(0, 0, 0)
         c.setLineWidth(0.5)
         c.setDash(2, 2)
         c.line(M_LEFT, y_cursor, M_RIGHT, y_cursor)
         y_cursor -= 4 * mm
-        
+
         # --- TABLEAU DES ARTICLES ---
         c.setDash()
         c.setFont(font_bold, 8.5)
         c.drawString(M_LEFT, y_cursor, "Désignation")
         c.drawRightString(M_RIGHT, y_cursor, "Total")
         y_cursor -= 3 * mm
-        
+
         c.line(M_LEFT, y_cursor, M_RIGHT, y_cursor)
         y_cursor -= 4.5 * mm
-        
+
         # Parcours des articles
         for art in items:
             c.setFont(font_bold, 8.5)
@@ -754,67 +757,67 @@ class Sales(ft.Container):
             if len(texte_art) > 26:
                 texte_art = texte_art[:23] + "..."
             c.drawString(M_LEFT, y_cursor, texte_art)
-            
+
             c.setFont(font_reg, 8.5)
             total_ligne = f"{int(art.get('total', 0)):,} FCFA"
             c.drawRightString(M_RIGHT, y_cursor, total_ligne)
             y_cursor -= 4 * mm
-            
+
             c.setFillColorRGB(0.4, 0.4, 0.4)
             calcul_txt = f"{art.get('qte', 1)} x {int(art.get('prix', 0)):,}"
             c.drawString(M_LEFT, y_cursor, calcul_txt)
             c.setFillColorRGB(0, 0, 0)
-            
+
             y_cursor -= 6 * mm
-            
+
         # --- SECTION FINANCIÈRE ---
         c.setDash(2, 2)
         c.line(M_LEFT, y_cursor, M_RIGHT, y_cursor)
         y_cursor -= 4.5 * mm
         c.setDash()
-        
+
         c.setFont(font_bold, 11)
         c.drawString(M_LEFT, y_cursor, "TOTAL FACTURE :")
         c.drawRightString(M_RIGHT, y_cursor, f"{int(total):,} FCFA")
         y_cursor -= 5 * mm
-        
+
         c.setFont(font_reg, 8.5)
         c.drawString(M_LEFT, y_cursor, "Mode de paiement :")
         c.drawRightString(M_RIGHT, y_cursor, mode_paiement)
         y_cursor -= 4 * mm
-        
+
         if str(mode_paiement).lower() in ["cash", "espèces", "especes"]:
             c.drawString(M_LEFT, y_cursor, "Montant Encaissé :")
             c.drawRightString(M_RIGHT, y_cursor, f"{int(encaisse):,} FCFA")
             y_cursor -= 4 * mm
-            
+
             c.drawString(M_LEFT, y_cursor, "Montant Rendu :")
             c.drawRightString(M_RIGHT, y_cursor, f"{int(rendu):,} FCFA")
             y_cursor -= 5 * mm
-            
+
         # --- FOOTER ---
         c.setDash(2, 2)
         c.line(M_LEFT, y_cursor, M_RIGHT, y_cursor)
         y_cursor -= 4.5 * mm
         c.setDash()
-        
+
         # 1. Message de confiance
         c.setFont(font_bold, 8.5)
         c.drawCentredString(C_CENTER, y_cursor, "Merci de votre confiance !")
         y_cursor -= 4 * mm
-        
+
         # 2. Adresse
         if adresse:
             c.setFont(font_reg, 8)
             c.drawCentredString(C_CENTER, y_cursor, f"Adresse : {adresse}")
             y_cursor -= 3.8 * mm
-            
+
         # 3. Contact
         if contact:
             c.setFont(font_reg, 8)
             c.drawCentredString(C_CENTER, y_cursor, f"Contact : {contact}")
             y_cursor -= 3.8 * mm
-            
+
         # 4. Message de fin
         c.setFont(font_reg, 7.5)
         c.drawCentredString(C_CENTER, y_cursor, "*** À bientôt ***")
@@ -822,31 +825,30 @@ class Sales(ft.Container):
         c.drawCentredString(C_CENTER, y_cursor, "")
         y_cursor -= 3.8 * mm
         c.drawCentredString(C_CENTER, y_cursor, "")
-        
+
         # 5. ESPACE BLANC DE FIN DE TICKET
         # On descend le curseur pour laisser la place physique au massicot sans toucher le texte
-        y_cursor -= 14 * mm 
-        
+        y_cursor -= 14 * mm
+
         # Sécurité pour s'assurer que ReportLab alloue bien l'espace jusqu'en bas
-        c.drawString(M_LEFT, y_cursor, "") 
-        
+        c.drawString(M_LEFT, y_cursor, "")
+
         c.showPage()
         c.save()
         y_cursor -= 15 * mm
-        
+
         return chemin_pdf
-    
+
     def ouvrir_et_imprimer_ticket(self, url_publique):
         """Ouvre automatiquement le ticket via son URL Supabase dans le navigateur par défaut."""
         if not url_publique:
             return
-        
+
         try:
             # Ouvre l'URL directement dans le navigateur internet de la machine
             webbrowser.open(url_publique)
             print(f"Ouverture du ticket dans le navigateur : {url_publique}")
         except Exception as err:
-            print(f"Erreur lors de l'ouverture de l'URL du ticket : {str(err)}")    
-            
-        
-        
+            print(f"Erreur lors de l'ouverture de l'URL du ticket : {str(err)}")
+
+

@@ -1,18 +1,15 @@
 import flet as ft
-from styles import ct_style, intern_ct_style, config_tf_style, login_style, radio_style
+from styles import radio_style, input_style, stat_style
 from components.components import StateButton, MyButton, MyTextButton
 from utils import (
     ACCESS_TOKEN, TENANT_ID, USER_ID, USER_NAME, TENANT_NAME, EXPIRATION_DATE,
-    ROLE, PLAN_CHOISI, resource_path, RED_COLOR, GREEN_COLOR, MAIN_COLOR, USER_EMAIL,
+    ROLE, PLAN_CHOISI, resource_path, MAIN_COLOR, USER_EMAIL, SHADOW_COLOR,
     BG_COLOR
 )
-import asyncio
-import threading
-import os
-import time
+import asyncio, threading, os, time
 from services.async_function import supabase_request_async
 from services.supabase_client import supabase_client, supabase_admin
-DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/profile_pictures/istockphoto-1142192548-612x612.jpg"
+DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/profile_pictures/images.png"
 
 
 class Users(ft.Container):
@@ -35,15 +32,15 @@ class Users(ft.Container):
         self.liste_des_users: list = []
 
         # --- COMPOSANTS DE L'INTERFACE ---
-        self.stat_total = ft.Text("0", size=20, font_family="PEB", color=MAIN_COLOR)
-        self.stat_managers = ft.Text("0", size=20, font_family="PEB", color="indigo")
-        self.stat_cashiers = ft.Text("0", size=20, font_family="PEB", color="teal")
+        self.stat_total = ft.Text("0", size=24, font_family="PEB",)
+        self.stat_managers = ft.Text("0", size=24, font_family="PEB",)
+        self.stat_cashiers = ft.Text("0", size=24, font_family="PEB", )
 
-        self.table = ft.ListView(expand=True, spacing=10, padding=10, divider_thickness=1)
+        self.table = ft.ListView(expand=True, spacing=15, padding=10,)
         self.loader = ft.ProgressRing(width=20, height=20, stroke_width=2, color=MAIN_COLOR, visible=False)
 
         self.search_user_field = ft.TextField(
-            **login_style, 
+            **input_style, 
             width=350, 
             label="Rechercher un collaborateur...", 
             prefix_icon=ft.Icons.SEARCH_ROUNDED,
@@ -58,22 +55,22 @@ class Users(ft.Container):
 
         # --- CHAMPS DU FORMULAIRE DE SAISIE ---
         self.new_user_name = ft.TextField(
-            **config_tf_style, prefix_icon=ft.Icons.PERSON_OUTLINE_ROUNDED,
+            **input_style, prefix_icon=ft.Icons.PERSON_OUTLINE_ROUNDED,
             label="Nom complet", width=440, capitalization=ft.TextCapitalization.CHARACTERS
         )
         self.new_user_email = ft.TextField(
-            **config_tf_style, prefix_icon=ft.Icons.MAIL_OUTLINED, width=440,
+            **input_style, prefix_icon=ft.Icons.MAIL_OUTLINED, width=440,
             label="Adresse Email professionnelle"
         )
         self.new_user_password = ft.TextField(
-            **config_tf_style, prefix_icon=ft.Icons.LOCK_OUTLINE_ROUNDED, width=440,
+            **input_style, prefix_icon=ft.Icons.LOCK_OUTLINE_ROUNDED, width=440,
             label="Mot de passe initial", password=True, can_reveal_password=True,
             value="123456"
         )
         self.new_role = ft.RadioGroup(
             content=ft.Row(
                 controls=[
-                    ft.Radio(**radio_style, label="Manager / Administrateur", value="manager"),
+                    ft.Radio(**radio_style, label="Manager", value="manager"),
                     ft.Radio(**radio_style, label="Caissier / Vendeur", value="cashier")
                 ],
                 spacing=20
@@ -108,9 +105,16 @@ class Users(ft.Container):
                 ft.Divider(height=15, color=ft.Colors.TRANSPARENT),
                 self.build_stats_row(),
                 ft.Divider(height=15, color=ft.Colors.TRANSPARENT),
-                ft.Row([self.search_user_field], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
-                ft.Container(content=self.table, expand=True)
+                ft.Container(
+                    **stat_style, expand=True,
+                    content=ft.Column(
+                        controls=[
+                            ft.Row([self.search_user_field], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
+                            ft.Container(content=self.table, expand=True)
+                        ]
+                    )
+                )
             ],
             spacing=10
         )
@@ -139,6 +143,7 @@ class Users(ft.Container):
     def build_stats_row(self):
         def create_stat_card(title, text_control, icon):
             return ft.Container(
+                **stat_style, width=270,
                 content=ft.Column(
                     controls=[
                         ft.Row(
@@ -149,13 +154,12 @@ class Users(ft.Container):
                         ), text_control
                     ], 
                 ),
-                border_radius=8, bgcolor=ft.Colors.GREY_50, border=ft.border.all(1, BG_COLOR), padding=10, width=270,
-                # shadow=ft.BoxShadow(blur_radius=4, color="grey100")
+
             )
         return ft.Row([
-            create_stat_card("Total Collaborateurs", self.stat_total, "assets/iucons/grey/users.svg"),
-            create_stat_card("Managers / Admins", self.stat_managers, "assets/icons/others/user-star.svg"),
-            create_stat_card("Caissiers", self.stat_cashiers, "assets/icons/grey/user.svg"),
+            create_stat_card("Admin", self.stat_total, "assets/icons/others/user-lock.svg"),
+            create_stat_card("Manager", self.stat_managers, "assets/icons/others/user-star.svg"),
+            create_stat_card("Caissiers", self.stat_cashiers, "assets/icons/others/user.svg"),
         ], spacing=15, wrap=True)
 
     async def load_datas(self):
@@ -165,7 +169,7 @@ class Users(ft.Container):
         )
         self.liste_des_users = utilisateurs if (utilisateurs and isinstance(utilisateurs, list)) else []
         
-        self.stat_total.value = str(len(self.liste_des_users))
+        self.stat_total.value = str(sum(1 for u in self.liste_des_users if u.get("role") == "admin"))
         self.stat_managers.value = str(sum(1 for u in self.liste_des_users if u.get("role") == "manager"))
         self.stat_cashiers.value = str(sum(1 for u in self.liste_des_users if u.get("role") == "cashier"))
         
@@ -214,7 +218,7 @@ class Users(ft.Container):
                             ft.Row([
                                 ft.Text(row.get("nom", "SANS NOM"), size=16, font_family="PPB"),
                                 ft.Container(
-                                    content=ft.Text("Moi", size=12, color="grey", font_family="PPM", ),
+                                    content=ft.Text("Moi", size=12, color="white", font_family="PPM", ),
                                     bgcolor=MAIN_COLOR, padding=ft.padding.only(left=6, right=6, top=2, bottom=2),
                                     border_radius=5, visible=is_me
                                 )
@@ -269,14 +273,16 @@ class Users(ft.Container):
             role_label, role_color, role_icon = "Caissier / Vendeur", "teal", ft.Icons.POINT_OF_SALE_ROUNDED
 
         # Construction dynamique du contenu de la fiche
-        self.cp.new_user_form.content = ft.Column(
+        self.cp.st_container.content.height = 700
+        self.cp.st_container.content.width = 600
+        self.cp.st_form.content = ft.Column(
             controls=[
                 # En-tête de la fiche
                 ft.Row([
                     ft.Text("Fiche Collaborateur", size=22, font_family="PEB"),
                     ft.IconButton(
                         icon=ft.Icons.CLOSE_ROUNDED, icon_color="grey800",
-                        on_click=lambda e: self.cp.hide_container(self.cp.new_user_container)
+                        on_click=lambda e: self.cp.hide_container(self.cp.st_container)
                     )
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(height=5, thickness=1, color="grey200"),
@@ -353,7 +359,7 @@ class Users(ft.Container):
                         icon_color="red",
                         style=ft.ButtonStyle(color="red"),
                         on_click=lambda e: self.delete_user_from_profile(user_data),
-                        visible=not is_me
+                        visible=not is_me,
                     )
                 ], alignment=ft.MainAxisAlignment.CENTER)
             ],
@@ -362,12 +368,12 @@ class Users(ft.Container):
         )
         
         # Affichage du conteneur lié au stack
-        self.cp.show_container(self.cp.new_user_container)
+        self.cp.show_container(self.cp.st_container)
         self.cp.update()
 
     def delete_user_from_profile(self, user_data):
         """Handler de suppression lié depuis le volet de profil"""
-        self.cp.hide_container(self.cp.new_user_container) # Ferme le volet en premier
+        self.cp.hide_container(self.cp.st_container) # Ferme le volet en premier
         self._execute_deletion(user_data.get('id'), user_data.get('nom'))
 
     def delete_user_from_list(self, e):
@@ -437,16 +443,19 @@ class Users(ft.Container):
             self.cp.page.overlay.append(self.file_picker)
             self.cp.page.update()
 
-        self.cp.new_user_form.content = ft.Column(
+        self.cp.st_container.content.height = 700
+        self.cp.st_container.content.width = 500
+        self.cp.st_form.content = ft.Column(
             controls=[
                 ft.Row([
                     ft.Text("Nouvel Utilisateur", size=22, font_family="PEB"),
-                    ft.IconButton(icon=ft.Icons.CLOSE_ROUNDED, icon_color="grey800", on_click=lambda e: self.cp.hide_container(self.cp.new_user_container))
+                    ft.IconButton(icon=ft.Icons.CLOSE_ROUNDED, icon_color="grey800", on_click=lambda e: self.cp.hide_container(self.cp.st_container))
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(height=5, thickness=1, color="grey200"),
                 ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
 
                 ft.Container(
+                    **stat_style,
                     content=ft.Row([
                         self.avatar_preview,
                         ft.Column([
@@ -454,7 +463,6 @@ class Users(ft.Container):
                             MyTextButton("Parcourir le disque...", lambda _: self.file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE))
                         ], spacing=2)
                     ], spacing=15),
-                    bgcolor="grey50", padding=15, border_radius=10, border=ft.border.all(1, "grey200")
                 ),
                 ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
                 
@@ -472,7 +480,7 @@ class Users(ft.Container):
             ],
             spacing=10, scroll=ft.ScrollMode.ADAPTIVE
         )
-        self.cp.show_container(self.cp.new_user_container)
+        self.cp.show_container(self.cp.st_container)
         self.cp.update()
 
     async def add_new_user(self, e):
@@ -517,7 +525,7 @@ class Users(ft.Container):
             # 4. Insertion dans la table publique profiles
             supabase_client.table("profiles").insert(profile_data).execute()
 
-            self.cp.hide_container(self.cp.new_user_container)
+            self.cp.hide_container(self.cp.st_container)
             self.cp.show_alert(f"Le compte de {self.new_user_name.value} est opérationnel", ft.Icons.CHECK_CIRCLE_ROUNDED, ft.Colors.GREEN)
             await self.load_datas()
 

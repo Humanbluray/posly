@@ -1,19 +1,70 @@
 from calendar import month
-
 import flet as ft
 import datetime, os, sys
 from typing import List
 
+
+# --- Pallette orange (origine) ---
 MAIN_COLOR = "#ff7f00"
-# MAIN_COLOR = "#ff9d00"
-# MAIN_COLOR = "#133fa6"
 SECOND_COLOR = "#ff952b"
-# SECOND_COLOR = "#2560e7"
 THIRD_COLOR = ft.Colors.DEEP_PURPLE_50
-THUMB_COLOR = ft.Colors.DEEP_PURPLE_100
 RED_COLOR = "#e1040a"
 GREEN_COLOR = "#308f62"
-BG_COLOR = "#f0f3fc"
+
+# --- Couleurs light mode ---
+BG_COLOR_LIGHT = "#F8FAFC"
+CARD_BG_LIGHT = "#FFFFFF"
+SURFACE_COLOR_LIGHT = "#FFFFFF"   # Pour tous les containers "blancs"
+TEXT_PRIMARY_LIGHT = "#212529"
+TEXT_SECONDARY_LIGHT = "#6C757D"
+BORDER_COLOR_LIGHT = "#E9ECEF"
+
+# --- Couleurs dark mode ---
+BG_COLOR_DARK = "#1A1A2E"
+CARD_BG_DARK = "#2D2D44"
+SURFACE_COLOR_DARK = "#1E1E2E"    # Fond sombre pour les containers
+TEXT_PRIMARY_DARK = "#F1F5F9"
+TEXT_SECONDARY_DARK = "#94A3B8"
+BORDER_COLOR_DARK = "#3E3E5E"
+
+# --- Variables globales ---
+BG_COLOR = BG_COLOR_LIGHT
+CARD_BG = CARD_BG_LIGHT
+SURFACE_COLOR = SURFACE_COLOR_LIGHT   # Nouvelle variable
+TEXT_PRIMARY = TEXT_PRIMARY_LIGHT
+TEXT_SECONDARY = TEXT_SECONDARY_LIGHT
+BORDER_COLOR = BORDER_COLOR_LIGHT
+SHADOW_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.BLACK)
+
+def apply_theme(theme_mode):
+    """Applique le thème et met à jour les constantes globales"""
+    global BG_COLOR, CARD_BG, SURFACE_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, BORDER_COLOR, SHADOW_COLOR
+    
+    if theme_mode == ft.ThemeMode.DARK:
+        BG_COLOR = BG_COLOR_DARK
+        CARD_BG = CARD_BG_DARK
+        SURFACE_COLOR = SURFACE_COLOR_DARK
+        TEXT_PRIMARY = TEXT_PRIMARY_DARK
+        TEXT_SECONDARY = TEXT_SECONDARY_DARK
+        BORDER_COLOR = BORDER_COLOR_DARK
+        SHADOW_COLOR = ft.Colors.with_opacity(0.3, ft.Colors.BLACK)
+    else:
+        BG_COLOR = BG_COLOR_LIGHT
+        CARD_BG = CARD_BG_LIGHT
+        SURFACE_COLOR = SURFACE_COLOR_LIGHT
+        TEXT_PRIMARY = TEXT_PRIMARY_LIGHT
+        TEXT_SECONDARY = TEXT_SECONDARY_LIGHT
+        BORDER_COLOR = BORDER_COLOR_LIGHT
+        SHADOW_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.BLACK)
+
+# Initialisation par défaut (light)
+apply_theme(ft.ThemeMode.LIGHT)
+
+# ... (tes autres fonctions)
+
+# ... (toutes tes autres fonctions : format_milliers_fr, resource_path, etc.)
+
+
 
 ACCESS_TOKEN = "access_token"
 USER_ID = "user_id"
@@ -196,11 +247,3 @@ def resource_path(relative_path):
 def find_facture_number():
     month = datetime.date.today().month
     year = datetime
-
-
-if __name__ == "__main__":
-    date = create_objet_date("08-06-2026")
-    print(date)
-
-    date = datetime.date.today() - datetime.timedelta(days=1)
-    print(date)
