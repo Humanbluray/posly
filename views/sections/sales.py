@@ -407,107 +407,111 @@ class Sales(ft.Container):
         self.cp.page.update()
 
     def open_valid_basket_container(self, e):
-        # on vide les précédents élements...
-        self.cp.valid_basket_form.content = None
-        self.basket_copy.controls.clear()
+        if self.role != "admin":
+            # on vide les précédents élements...
+            self.cp.valid_basket_form.content = None
+            self.basket_copy.controls.clear()
 
-        self.amount_copy.value = self.amount.value
+            self.amount_copy.value = self.amount.value
 
-        for item in self.basket.controls:
-            d = item.datas_item
-            self.basket_copy.controls.append(
-                ft.ListTile(
-                    title=ft.Text(d['designation'], size=14, font_family="PPB"),
-                    subtitle=ft.Text(f"{d['qty']} x {d['price']}", size=13, font_family="PPM", color="grey"),
-                    trailing=ft.Text(f"{d['qty'] * d['price']}", size=14, font_family="PPM"),
+            for item in self.basket.controls:
+                d = item.datas_item
+                self.basket_copy.controls.append(
+                    ft.ListTile(
+                        title=ft.Text(d['designation'], size=14, font_family="PPB"),
+                        subtitle=ft.Text(f"{d['qty']} x {d['price']}", size=13, font_family="PPM", color="grey"),
+                        trailing=ft.Text(f"{d['qty'] * d['price']}", size=14, font_family="PPM"),
+                    )
                 )
-            )
 
-        self.cp.valid_basket_form.content = content = ft.Column(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True,
-            controls=[
-                ft.Column(
-                    expand=True,
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Row(
-                                    controls=[
-                                        ft.Image(src="assets/icons/grey/badge-cent.svg", width=24, height=24),
-                                        ft.Text("Valider achat", size=22, font_family="PEB"),
-                                    ]
-                                ),
-                                ft.Container(
-                                    content=ft.Image(
-                                        src=resource_path("assets/icons/black/x.svg"),
-                                        width=24, height=24
+            self.cp.valid_basket_form.content = content = ft.Column(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True,
+                controls=[
+                    ft.Column(
+                        expand=True,
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Image(src="assets/icons/grey/badge-cent.svg", width=24, height=24),
+                                            ft.Text("Valider achat", size=22, font_family="PEB"),
+                                        ]
                                     ),
-                                    on_click=lambda e: self.cp.hide_container(self.cp.valid_basket_container)
-                                )
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                        ),
-                        self.basket_copy,
-                    ]
-                ),
-                ft.Column(
-                    controls=[
-                        ft.Divider(height=1, thickness=1),
-                        ft.Row(
-                            controls=[
-                                ft.Row(
-                                    controls=[
-                                        ft.Text("Activer table", size=16, font_family="PPM"),
-                                        self.switch_table
-                                    ]
-                                ),
-                                self.table_number
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                        ),
-                        ft.Row(
-                            controls=[
-                                ft.Text("Total", size=16, font_family="PPM", color="grey"),
-                                ft.Row(
-                                    controls=[
-                                        self.amount_copy, ft.Text("FCFA", size=16, font_family="PEB")
-                                    ], spacing=10
-                                )
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                        ),
-                        ft.Divider(height=1, thickness=1),
-                        ft.Row(
-                            controls=[
-                                ft.Text("Mode", size=16, font_family="PPM", color="grey"),
-                                self.payment_mode
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                        ),
-                        ft.Divider(height=1, thickness=1),
-                        ft.Row(
-                            controls=[
-                                ft.Text("Encaissé", size=16, font_family="PPM", color="grey"),
-                                self.espece
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                        ),
-                        ft.Divider(height=1, thickness=1),
-                        ft.Row(
-                            controls=[
-                                ft.Text("Rendu", size=16, font_family="PPM", color="grey"),
-                                self.due
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        ),
-                        MyButton(
-                            title="Valider achat", icon=resource_path(''),
-                            click=self.valider_panier
-                        ),
-                        StyledButton(
-                            "Abandonner", ft.Icons.CHECK, self.annuler_commande
-                        ),
+                                    ft.Container(
+                                        content=ft.Image(
+                                            src=resource_path("assets/icons/black/x.svg"),
+                                            width=24, height=24
+                                        ),
+                                        on_click=lambda e: self.cp.hide_container(self.cp.valid_basket_container)
+                                    )
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            self.basket_copy,
+                        ]
+                    ),
+                    ft.Column(
+                        controls=[
+                            ft.Divider(height=1, thickness=1),
+                            ft.Row(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text("Activer table", size=16, font_family="PPM"),
+                                            self.switch_table
+                                        ]
+                                    ),
+                                    self.table_number
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.Text("Total", size=16, font_family="PPM", color="grey"),
+                                    ft.Row(
+                                        controls=[
+                                            self.amount_copy, ft.Text("FCFA", size=16, font_family="PEB")
+                                        ], spacing=10
+                                    )
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Divider(height=1, thickness=1),
+                            ft.Row(
+                                controls=[
+                                    ft.Text("Mode", size=16, font_family="PPM", color="grey"),
+                                    self.payment_mode
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Divider(height=1, thickness=1),
+                            ft.Row(
+                                controls=[
+                                    ft.Text("Encaissé", size=16, font_family="PPM", color="grey"),
+                                    self.espece
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Divider(height=1, thickness=1),
+                            ft.Row(
+                                controls=[
+                                    ft.Text("Rendu", size=16, font_family="PPM", color="grey"),
+                                    self.due
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            ),
+                            MyButton(
+                                title="Valider achat", icon=resource_path(''),
+                                click=self.valider_panier
+                            ),
+                            StyledButton(
+                                "Abandonner", ft.Icons.CHECK, self.annuler_commande
+                            ),
 
-                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER
-                )
-            ]
-        )
-        self.cp.show_container(self.cp.valid_basket_container)
-        self.cp.page.update()
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                    )
+                ]
+            )
+            self.cp.show_container(self.cp.valid_basket_container)
+            self.cp.page.update()
+
+        else:
+            self.cp.show_alert("Vous n'avez pas les droits pour cette action", ft.Icons.INFO, ft.Colors.AMBER)
 
     def on_switch_change(self, e):
         if self.switch_table.value:

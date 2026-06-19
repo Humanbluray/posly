@@ -15,8 +15,8 @@ from utils import ROLE
 
 roles = {
     "admin": {
-        "Board": True, "Ventes": False, "Rapports": True, "Inventaires": True, "Produits": True,
-        "Paramètres": True, 'Entrées': True, "Utilisateurs": True , "Facturation": True
+        "Board": True, "Ventes": True, "Rapports": True, "Inventaires": True, "Produits": True,
+        "Paramètres": True, 'Entrées': True, "Utilisateurs": True , "Facturation": False
     },
     "cashier": {
         "Board": False, "Ventes": True, "Rapports": True, "Inventaires": True, "Produits": True,

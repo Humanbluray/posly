@@ -485,48 +485,79 @@ class Users(ft.Container):
 
     async def add_new_user(self, e):
         if not self.new_user_email.value or not self.new_user_name.value or not self.new_user_password.value:
-            self.cp.show_alert("Veuillez remplir tous les critères obligatoires", ft.Icons.INFO_OUTLINED, ft.Colors.AMBER)
+            self.cp.show_alert("Veuillez remplir tous les critères obligatoires", ft.Icons.INFO_OUTLINED,
+                               ft.Colors.AMBER)
             return
 
         self.loader.visible = True
         self.update()
 
         try:
-            # 2. Création dans Supabase Auth via l'API admin
+            # 1. Création dans Supabase Auth via l'API admin
             auth_response = supabase_admin.auth.admin.create_user({
                 "email": self.new_user_email.value,
                 "password": self.new_user_password.value,
                 "email_confirm": True,
                 "user_metadata": {
-                    "role": self.new_role.value, 
-                    "tenant_id": str(self.tenant_id), 
+                    "role": self.new_role.value,
+                    "tenant_id": str(self.tenant_id),
                     "nom_complet": self.new_user_name.value
                 }
             })
 
-            # CORRECTION ICI : Supabase-py encapsule la réponse dans l'attribut .data
-            if not auth_response or not hasattr(auth_response, 'data') or not auth_response.data:
-                self.cp.show_alert("Le serveur d'authentification a rejeté la requête", ft.Icons.ERROR_OUTLINE_ROUNDED, ft.Colors.RED)
+            if not auth_response:
+                self.cp.show_alert("Le serveur d'authentification n'a renvoyé aucune réponse",
+                                   ft.Icons.ERROR_OUTLINE_ROUNDED, ft.Colors.RED)
                 return
 
-            new_user_auth = auth_response.data
+            # 2. Extraction sécurisée et adaptative de l'ID utilisateur (UUID)
+            user_id = None
 
-            # 3. Préparation des données du profil
+            # Cas 1 : La réponse possède un attribut 'user' direct (Standard Supabase AuthAdminResponse)
+            if hasattr(auth_response, 'user') and auth_response.user:
+                user_id = auth_response.user.id
+
+            # Cas 2 : La réponse passe par l'attribut '.data'
+            elif hasattr(auth_response, 'data') and auth_response.data:
+                data_content = auth_response.data
+                if hasattr(data_content, 'user') and data_content.user:
+                    user_id = data_content.user.id
+                elif hasattr(data_content, 'id'):
+                    user_id = data_content.id
+                elif isinstance(data_content, dict):
+                    user_id = data_content.get('id') or data_content.get('user', {}).get('id')
+
+            # Cas 3 : La réponse est un dictionnaire brut
+            elif isinstance(auth_response, dict):
+                user_id = auth_response.get('id') or auth_response.get('user', {}).get('id')
+
+            # Si malgré toutes les vérifications l'ID reste introuvable
+            if not user_id:
+                print(f"[DEBUG SUPABASE RESP] Structure inconnue : {auth_response}")
+                self.cp.show_alert("Impossible de récupérer l'identifiant du compte créé",
+                                   ft.Icons.ERROR_OUTLINE_ROUNDED, ft.Colors.RED)
+                return
+
+            # 3. Préparation des données du profil public
             profile_data = {
-                "id": new_user_auth.id, # Récupération de l'ID corrigée
+                "id": str(user_id),  # Utilisation de l'ID extrait de façon sécurisée
                 "tenant_id": str(self.tenant_id),
                 "email": self.new_user_email.value,
                 "role": self.new_role.value,
                 "nom": self.new_user_name.value,
                 "avatar_url": self.uploaded_avatar_url if self.uploaded_avatar_url else DEFAULT_IMAGE,
-                "is_first_login": True # AJOUT : Flag pour forcer le changement de mot de passe au Home
+                "is_first_login": True
             }
 
-            # 4. Insertion dans la table publique profiles
+            # 4. Insertion dans la table publique 'profiles'
             supabase_client.table("profiles").insert(profile_data).execute()
 
+            # 5. UI : Fermeture du volet, alerte de succès et rechargement de la grille
             self.cp.hide_container(self.cp.st_container)
-            self.cp.show_alert(f"Le compte de {self.new_user_name.value} est opérationnel", ft.Icons.CHECK_CIRCLE_ROUNDED, ft.Colors.GREEN)
+            self.cp.show_alert(f"Le compte de {self.new_user_name.value} est opérationnel",
+                               ft.Icons.CHECK_CIRCLE_ROUNDED, ft.Colors.GREEN)
+
+            # Rechargement asynchrone propre des données
             await self.load_datas()
 
         except Exception as ex:
@@ -535,5 +566,4 @@ class Users(ft.Container):
         finally:
             self.loader.visible = False
             self.update()
-            
             
