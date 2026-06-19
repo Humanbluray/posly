@@ -327,7 +327,6 @@ class HomeView(ft.View):
             password=True,
             can_reveal_password=True,
             prefix_icon=ft.Icons.LOCK_OUTLINED,
-            height=48
         )
         
         self.modal_error_text = ft.Text("", color="red", size=13, font_family="PPM", visible=False)
@@ -381,15 +380,15 @@ class HomeView(ft.View):
         confirm_pwd = self.confirm_password_tf.value.strip()
 
         if not new_pwd or not confirm_pwd:
-            self.show_modal_error("Veuillez remplir les deux champs.")
+            self.show_alert("Veuillez remplir les deux champs.", ft.Icons.INFO, ft.Colors.AMBER)
             return
 
         if len(new_pwd) < 6:
-            self.show_modal_error("Le mot de passe doit contenir au moins 6 caractères.")
+            self.show_alert("Le mot de passe doit contenir au moins 6 caractères.", ft.Icons.INFO, ft.Colors.AMBER)
             return
 
         if new_pwd != confirm_pwd:
-            self.show_modal_error("Les mots de passe ne correspondent pas.")
+            self.show_alert("Les mots de passe ne correspondent pas.", ft.Icons.INFO, ft.Colors.AMBER)
             return
 
         # Activation du loader visuel interne au bouton modal
@@ -402,6 +401,7 @@ class HomeView(ft.View):
         try:
             # A. Mise à jour du mot de passe dans Supabase Auth
             supabase_client.auth.update_user({"password": new_pwd})
+            print('Changement du mot de passe réussi')
 
             # B. Mise à jour de la table profiles pour lever définitivement le flag de blocage
             supabase_client.table("profiles").update({"is_first_login": False}).eq("id", self.user_id).execute()
@@ -415,11 +415,11 @@ class HomeView(ft.View):
             self.page.update()
 
             # Message général de félicitations
-            self.show_alert("Votre mot de passe a été configuré avec succès !", ft.Icons.CHECK_CIRCLE, GREEN_COLOR)
+            self.show_alert("Votre mot de passe a été configuré avec succès !", ft.Icons.CHECK_CIRCLE, ft.Colors.LIGHT_GREEN)
 
         except Exception as err:
             print(f"Erreur lors de la réinitialisation initiale : {err}")
-            self.show_modal_error("Échec de la configuration. Réessayez.")
+            self.show_alert("Échec de la configuration. Réessayez.", ft.Icons.INFO, ft.Colors.AMBER)
     
     def show_container(self, container):
         container.visible = True
