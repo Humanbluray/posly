@@ -1,16 +1,16 @@
 import flet as ft
-import os
+import os, datetime
 import uuid
-from styles import input_style, drop_style, datatable_style, stat_style
+from styles import input_style, drop_style, datatable_style, stat_style, login_style
 from components.components import MyButton
 from utils import (
     ACCESS_TOKEN, TENANT_ID, ROLE, MAIN_COLOR, BG_COLOR, resource_path, format_milliers_fr, CARD_BG, BORDER_COLOR, SHADOW_COLOR
 )
 import asyncio, threading
 from services.async_function import supabase_request_async
-from services.supabase_client import supabase_client
+from services.supabase_client import supabase_client, supabase_admin
 
-DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/images/19005357.png"
+DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/images/no%20image.jpeg"
 
 
 class Products(ft.Container):
@@ -81,10 +81,85 @@ class Products(ft.Container):
         self.p_image_name = ft.TextField(**input_style, label="Image sélectionnée", width=300, read_only=True,
                                          hint_text="Aucune image choisie (Image par défaut)")
 
+        #champs du formulaire de modification
+        self.selected_product_id = 0
+        self.edit_designation_field = ft.TextField(**input_style, label="Désignation du produit", width=440,
+                                   capitalization=ft.TextCapitalization.WORDS)
+        self.edit_price_field = ft.TextField(**input_style, label="Prix", width=170, input_filter=ft.NumbersOnlyInputFilter(),
+                                    text_align=ft.TextAlign.RIGHT)
+        self.edit_price_buy_field = ft.TextField(**input_style, label="Prix achat", width=170,
+                                        input_filter=ft.NumbersOnlyInputFilter(), text_align=ft.TextAlign.RIGHT)
+        self.edit_type_field = ft.TextField(**input_style, label="Désignation du produit", width=440,
+                                   capitalization=ft.TextCapitalization.WORDS)
+        # ================= ZONE EDITION DE PRODUIT =================
+        # Image par défaut pour la prévisualisation dans la fenêtre de modification
+        self.fp = ft.FilePicker(on_result=self.on_file_picker_result)
+        self.cp.page.overlay.append(self.fp)
+        self.edit_image = ft.Image(
+            src=DEFAULT_IMAGE,
+            width=100,
+            height=100,
+            fit=ft.ImageFit.COVER,
+            border_radius=ft.border_radius.all(50)
+        )
+
+        # Bouton d'upload positionné par-dessus ou à côté de l'image
+        self.upload_btn = ft.IconButton(
+            icon=ft.Icons.ADD_A_PHOTO_ROUNDED,
+            icon_color=MAIN_COLOR,
+            bgcolor=ft.Colors.WHITE,
+            icon_size=20,
+            tooltip="Changer l'image",
+            right=0,
+            bottom=0,
+            on_click=lambda _: self.fp.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
+        )
+
+        # Variable pour stocker le produit en cours de modification
+        self.selected_product_id = None
+
         # File pickers
         self.excel_picker = ft.FilePicker(on_result=self.on_excel_file_picked)
         self.image_picker = ft.FilePicker(on_result=self.on_image_file_picked)
         self.cp.page.overlay.extend([self.excel_picker, self.image_picker])
+
+        # Bouton pour générer et télécharger le modèle Excel
+        self.btn_download_template = MyButton(
+            title="Modèle Excel",
+            icon=ft.Icons.DOWNLOAD_ROUNDED,
+            click=self.generate_excel_template
+        )
+
+        # Le bouton d'import existant appellera maintenant le choix de l'emplacement du stock
+        self.btn_import_excel = MyButton(
+            title="Importer Excel",
+            icon=ft.Icons.UPLOAD_FILE_ROUNDED,
+            click=self.open_import_destination_modal
+        )
+
+        # Variable de classe à initialiser dans __init__
+        self.selected_stock_destination = "products"  # "products" = Boutique, "stock_tampons" = Tampon
+
+        # ================= ZONE APPROVISIONNEMENT STOCK TAMPON =================
+        self.tampon_dropdown_produits = ft.Dropdown(**drop_style, label="Sélectionner le produit", width=300, menu_height=200)
+        self.tampon_qty_field = ft.TextField(
+            **login_style, label="Quantité", hint_text="Ex: 50", width=120,
+            value="1", input_filter=ft.NumbersOnlyInputFilter()
+        )
+        self.tampon_panier_table = ft.DataTable(
+            **datatable_style,
+            columns=[
+                ft.DataColumn(ft.Text("Désignation")),
+                ft.DataColumn(ft.Text("Quantité")),
+                ft.DataColumn(ft.Text("Action")),
+            ]
+        )
+        # Liste locale pour stocker les éléments du panier
+        self.tampon_panier_items = []
+
+
+        # Liste Python locale pour stocker les éléments du panier avant validation
+        self.tampon_panier_items = []
 
         has_admin_rights = self.user_role in ["admin", "manager"]
 
@@ -115,9 +190,19 @@ class Products(ft.Container):
                                                 "Ajouter un produit", resource_path("assets/icons/white/user-plus.svg"),
                                                      click=self.open_add_product_container
                                             ),
+                                            MyButton(
+                                                title="Modèle Excel",
+                                                icon=ft.Icons.DOWNLOAD_ROUNDED,
+                                                click=self.generate_excel_template
+                                            ),
                                             MyButton("Importer via excel", resource_path("assets/icons/white/sheet.svg"),
-                                                     click=lambda e: self.excel_picker.pick_files(
-                                                         allowed_extensions=["xlsx", "xls"])),
+                                                     click=self.open_import_destination_modal),
+                                            MyButton(
+                                                "Entrées Stock Tampon",
+                                                resource_path("assets/icons/white/plus.svg"),
+                                                # Ajuste le chemin de ton icône
+                                                lambda e: self.run_async_in_thread(self.open_entree_tampon_window(e))
+                                            )
                                         ],
                                         visible=has_admin_rights
                                     )
@@ -223,7 +308,7 @@ class Products(ft.Container):
             if can_edit:
                 edit_btn = ft.Container(
                     content=ft.Image(resource_path("assets/icons/grey/pen.svg"), width=18, height=18),
-                    on_click=lambda e, p=prod: self.open_edit_product_container(p),
+                    on_click=lambda e, p=prod: self.open_edit_window(p),
                     data=prod
                 )
                 transfer_btn = ft.Container(
@@ -323,7 +408,7 @@ class Products(ft.Container):
         self.cp.page.update()
 
     async def execute_transfer(self, product_id: str, qty: int):
-        """Effectue la mise à jour des stocks en base"""
+        """Effectue la mise à jour des stocks en boutique et tampon, puis consigne l'entrée"""
         if not product_id:
             self.cp.show_alert("Identifiant produit manquant.", ft.Icons.ERROR, ft.Colors.RED)
             return
@@ -332,7 +417,7 @@ class Products(ft.Container):
         self.cp.page.update()
 
         try:
-            # Récupérer les stocks actuels via la vue
+            # 1. Récupérer les stocks actuels via la vue
             params = {'select': '*', 'produit_id': f'eq.{product_id}'}
             result = await supabase_request_async(
                 access_token=self.access_token,
@@ -346,19 +431,19 @@ class Products(ft.Container):
                 return
 
             data = result[0]
-            print(data, type(data))
+
             # Récupération sécurisée des stocks (convertir None en 0)
             stock_boutique = int(data.get("stock_reel") or 0)
             stock_tampon = int(data.get("stock_tampon") or 0)
-            print("stock réel", stock_boutique)
-            print('st tampon', stock_tampon)
+            prix_unitaire = float(data.get("price") or 0.0)  # Récupération du prix pour l'historique d'entrée
 
-            # Validation
+            # 2. Validation des quantités
             if qty <= 0:
                 self.cp.show_alert("La quantité doit être positive.", ft.Icons.WARNING, ft.Colors.ORANGE)
                 return
             if qty > stock_tampon:
-                self.cp.show_alert(f"Stock tampon insuffisant. Disponible : {stock_tampon}.", ft.Icons.ERROR, ft.Colors.RED)
+                self.cp.show_alert(f"Stock tampon insuffisant. Disponible : {stock_tampon}.", ft.Icons.ERROR,
+                                   ft.Colors.RED)
                 return
 
             # 3. Calcul des nouveaux stocks
@@ -367,17 +452,14 @@ class Products(ft.Container):
 
             # 4. Mise à jour de la table products (stock boutique)
             update_payload = {"stock": new_stock_boutique}
-
             await supabase_request_async(
                 access_token=self.access_token,
                 tenant_id=self.tenant_id,
                 table_name="products",
                 method="PATCH",
-                params={"id": f"eq.{int(product_id)}"},  # Uniquement le filtre ici
-                data=update_payload                 # Le payload va dans le corps JSON (adapte le nom de l'argument si nécessaire, ex: payload=...)
+                params={"id": f"eq.{int(product_id)}"},
+                data=update_payload
             )
-            
-            new_stock_tampon = stock_tampon - qty
 
             # 5. Mise à jour de la table stock_tampons (stock tampon)
             update_payload_tampon = {"stock": new_stock_tampon}
@@ -386,21 +468,37 @@ class Products(ft.Container):
                 tenant_id=self.tenant_id,
                 table_name="stock_tampons",
                 method="PATCH",
-                params={"id": f"eq.{int(product_id)}"},  # Uniquement le filtre ici
-                data=update_payload_tampon               # Le payload va dans le corps JSON (adapte le nom de l'argument si nécessaire, ex: payload=...)
+                params={"id": f"eq.{int(product_id)}"},
+                data=update_payload_tampon
             )
 
-            # 6. Recharger l'affichage
+            # 6. NOUVEAU : Consignation du mouvement dans entrees_details pour la RPC de clôture
+            # Note : La colonne 'date' prendra automatiquement la date du jour grâce au DEFAULT SQL configuré,
+            # mais envoyer le payload ainsi permet de structurer proprement la ligne.
+            payload_entree = {
+                "tenant_id": self.tenant_id,
+                "id_produit": int(product_id),
+                "qte": int(qty),
+                "prix": prix_unitaire,
+                "numero": f"TRF-{datetime.date.today().strftime('%Y%m%d')}"
+                # Génère une référence automatique de type TRF-20260620
+            }
+
+            await supabase_request_async(
+                access_token=self.access_token,
+                tenant_id=self.tenant_id,
+                table_name="entrees_details",
+                method="POST",
+                data=payload_entree
+            )
+
+            # 7. Recharger l'affichage local et notifier l'utilisateur
             await self.load_products_data()
             self.cp.show_alert(
-                f"Transfert de {qty} unité(s) effectué avec succès !", 
-                ft.Icons.CHECK_CIRCLE, 
+                f"Transfert de {qty} unité(s) effectué et comptabilisé avec succès !",
+                ft.Icons.CHECK_CIRCLE,
                 ft.Colors.GREEN
             )
-
-            # Recharger la liste des produits
-            await self.load_products_data()
-            self.cp.show_alert(f"Transfert de {qty} unité(s) effectué avec succès !", ft.Icons.CHECK_CIRCLE, ft.Colors.GREEN)
 
         except Exception as ex:
             print(f"Erreur lors du transfert : {ex}")
@@ -408,7 +506,7 @@ class Products(ft.Container):
         finally:
             self.loader.visible = False
             self.cp.page.update()
-            
+
     # --- Filtre de recherche ---
     def filter_products_locally(self, e):
         query = self.search_field.value.lower().strip()
@@ -461,7 +559,7 @@ class Products(ft.Container):
                             ft.IconButton(
                                 icon=ft.Icons.IMAGE_SEARCH_ROUNDED, icon_color=MAIN_COLOR, tooltip="Choisir une image",
                                 on_click=lambda _: self.image_picker.pick_files(
-                                    allowed_extensions=["png", "jpg", "jpeg"])
+                                    allowed_extensions=["png", "jpg", "jpeg", "webp", "svg"])
                             )
                         ], alignment=ft.MainAxisAlignment.START),
                         ft.Divider(height=15, color="transparent"),
@@ -536,67 +634,230 @@ class Products(ft.Container):
         self.cp.page.update()
 
     # --- Modification de produit ---
-    def open_edit_product_container(self, product_data):
-        self.p_name.value = product_data.get("designation", "")
-        self.p_name.disabled = False
+    def on_file_picker_result(self, e: ft.FilePickerResultEvent):
+        """Déclenché lorsque l'utilisateur sélectionne une image localement"""
+        if e.files and len(e.files) > 0:
+            # Enregistrer le chemin local absolu de l'image
+            self.selected_image_path = e.files[0].path
+            # Mettre à jour l'aperçu visuel immédiat dans la modale
+            self.edit_image.src = self.selected_image_path
+            self.edit_image.update()
+            print(f"Image locale prête pour le téléversement : {self.selected_image_path}")
 
-        self.cp.st_container.content.height = 300
-        self.cp.st_form.content = ft.Column(
+    async def upload_image_to_bucket(self, file_path: str = None) -> str:
+        """Téléverse l'image vers le bucket 'images' de Supabase et retourne son URL publique.
+        Sécurisée avec une valeur par défaut pour éviter le bug de l'argument manquant."""
+        try:
+            # Si aucun chemin n'est fourni en paramètre, on récupère celui stocké dans l'instance
+            path_a_charger = file_path if file_path is not None else self.selected_image_path
+
+            if not path_a_charger or not os.path.exists(path_a_charger):
+                print(f"[DEBUG] Chemin d'image invalide ou introuvable : {path_a_charger}")
+                return None
+
+            print(f"[DEBUG] Préparation de l'upload pour le fichier : {path_a_charger}")
+
+            # Générer un nom de fichier unique pour éviter les collisions dans le bucket
+            file_name = os.path.basename(path_a_charger)
+            unique_name = f"{uuid.uuid4()}_{file_name}"
+
+            # Lecture sécurisée du fichier binaire
+            with open(path_a_charger, "rb") as f:
+                file_data = f.read()
+
+            # Envoi binaire vers le bucket Supabase nommé 'images'
+            supabase_admin.storage.from_("images").upload(
+                path=unique_name,
+                file=file_data,
+                file_options={"content-type": "image/jpeg"}
+            )
+
+            # Récupération de l'URL publique officielle générée par Supabase
+            public_url = supabase_client.storage.from_("images").get_public_url(unique_name)
+            print(f"[DEBUG] Téléversement réussi ! URL publique : {public_url}")
+            return public_url
+
+        except Exception as ex:
+            print(f"[ERREUR STOCKAGE BUCKET] : {ex}")
+            return None
+
+    def open_edit_window(self, product_data: dict):
+        """Ouvre la fenêtre de modification en verrouillant les prix/types"""
+        # Sécurité : Intercepter 'id' ou 'produit_id' ou 'id_produit' au cas où
+        self.selected_product_id = product_data.get("id") or product_data.get("produit_id") or product_data.get(
+            "id_produit")
+
+        # S'imprimer le résultat dans la console pour vérifier en temps réel
+        print(f"[DEBUG] Fenêtre d'édition ouverte pour le produit : {product_data}")
+        print(f"[DEBUG] ID extrait et stocké dans self.selected_product_id : {self.selected_product_id}")
+
+        if not self.selected_product_id:
+            self.cp.show_alert("Erreur interne : Impossible de récupérer l'identifiant de ce produit.", ft.Icons.ERROR,
+                               ft.Colors.RED)
+            return
+
+        # 1. Remplissage des champs de texte... (le reste de ton code demeure identique)
+        self.edit_designation_field.value = product_data.get("designation", "")
+        self.edit_price_field.value = str(product_data.get("price", 0))
+        self.edit_price_buy_field.value = str(product_data.get("price_buy", 0))
+        self.edit_type_field.value = product_data.get("product_type", "")
+
+        # 2. RESTRICTIONS STRICTES : Passage en lecture seule et désactivation des prix et types
+        self.edit_price_field.read_only = True
+        self.edit_price_buy_field.read_only = True
+        self.edit_type_field.read_only = True
+
+        self.edit_price_field.disabled = True
+        self.edit_price_buy_field.disabled = True
+        self.edit_type_field.disabled = True
+
+        # La désignation reste totalement modifiable
+        self.edit_designation_field.read_only = False
+        self.edit_designation_field.disabled = False
+
+        # 3. LOGIQUE DE L'IMAGE : Modifiable SI ET SEULEMENT SI absente ou par défaut
+        current_image = product_data.get("image")
+        has_prior_image = (current_image is not None and current_image != "" and current_image != DEFAULT_IMAGE)
+
+        if has_prior_image:
+            self.edit_image.src = current_image
+            self.upload_btn.visible = False  # Cache le bouton d'upload si l'image existe déjà
+        else:
+            self.edit_image.src = DEFAULT_IMAGE
+            self.upload_btn.visible = True  # Affiche le bouton d'upload si le produit n'a pas d'image
+
+        # Réinitialisation du chemin temporaire de l'image sélectionnée
+        self.selected_image_path = None
+
+        # 4. Configuration de l'interface graphique du conteneur st_container
+        self.cp.st_container.content.width = 500
+        self.cp.st_container.content.height = 550
+
+        form_content = ft.Column(
+            expand=True,
+            spacing=15,
             controls=[
-                ft.Row([
-                    ft.Text("Modifier le Produit", size=22, font_family="PEB"),
-                    ft.IconButton(icon=ft.Icons.CLOSE_ROUNDED,
-                                  on_click=lambda _: self.cp.hide_container(self.cp.st_container))
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(height=5, color="grey200"),
-                ft.Divider(height=10, color="transparent"),
-                ft.Text("Seul le nom de l'article est modifiable après création.", size=12, color="grey"),
-                self.p_name,
-                ft.Divider(height=15, color="transparent"),
-                ft.Row([
-                    MyButton("Enregistrer les modifications", resource_path("assets/icons/white/user-check.svg"),
-                             click=lambda e, p_id=product_data.get("id"): self.run_async_in_thread(
-                                 self.save_edited_product(p_id)))
-                ], alignment=ft.MainAxisAlignment.END)
-            ],
-            spacing=10, scroll=ft.ScrollMode.ADAPTIVE
+                ft.Container(
+                    padding=20, bgcolor="white",
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text("Modifier le Produit", size=18, font_family="PEB"),
+                            ft.Container(
+                                content=ft.Image(resource_path("assets/icons/black/x.svg"), width=20, height=20),
+                                on_click=lambda _: self.cp.hide_container(self.cp.st_container)
+                            )
+                        ]
+                    ),
+                ),
+                ft.Divider(height=1, thickness=1),
+                ft.Container(
+                    padding=20,
+                    expand=True,
+                    content=ft.ListView(
+                        expand=True,
+                        spacing=15,
+                        controls=[
+                            ft.Row(
+                                alignment=ft.MainAxisAlignment.CENTER,
+                                controls=[
+                                    ft.Stack(
+                                        controls=[
+                                            ft.Container(
+                                                width=100, height=100, border_radius=50,
+                                                border=ft.border.all(1, "grey"),
+                                                content=self.edit_image
+                                            ),
+                                            self.upload_btn
+                                        ]
+                                    )
+                                ]
+                            ),
+                            self.edit_designation_field,
+                            self.edit_type_field,
+                            ft.Row([self.edit_price_buy_field, self.edit_price_field], spacing=10),
+                        ]
+                    )
+                ),
+                ft.Divider(height=1, thickness=1),
+                ft.Container(
+                    padding=20,
+                    alignment=ft.alignment.center,
+                    content=MyButton(
+                        "Enregistrer les modifications",
+                        resource_path("assets/icons/white/check.svg"),
+                        lambda e: self.run_async_in_thread(self.save_edit_product(e))
+                    )
+                )
+            ]
         )
-        self.cp.show_container(self.cp.st_container)
-        self.cp.update()
 
-    async def save_edited_product(self, product_id):
-        if not self.p_name.value:
-            self.cp.show_alert("La désignation ne peut pas être vide !", ft.Icons.ERROR_OUTLINED, ft.Colors.RED)
+        self.cp.st_container.content.content = form_content
+        self.cp.show_container(self.cp.st_container)
+        self.cp.page.update()
+
+    async def save_edit_product(self, e):
+        """Enregistre uniquement les modifications de la désignation et de l'image
+        si elle a été ajoutée avec retour visuel en cas d'erreur"""
+        if not self.selected_product_id:
+            self.cp.show_alert("Aucun produit sélectionné pour la modification.", ft.Icons.ERROR, ft.Colors.RED)
+            return
+
+        designation_val = self.edit_designation_field.value.strip() if self.edit_designation_field.value else ""
+        if not designation_val:
+            self.cp.show_alert("La désignation est obligatoire.", ft.Icons.WARNING, ft.Colors.ORANGE)
             return
 
         self.loader.visible = True
         self.cp.page.update()
-        update_payload = {"designation": self.p_name.value.strip()}
 
         try:
+            # Sécurité maximale : On ne construit le payload QU'AVEC la désignation au départ
+            update_payload = {
+                "designation": designation_val
+            }
+
+            # Si une nouvelle image a été choisie (lorsque le bouton était visible)
+            if hasattr(self, 'selected_image_path') and self.selected_image_path:
+                print(f"[DEBUG] Début du téléversement de l'image : {self.selected_image_path}")
+
+                # --- CORRECTION ICI : Passage du chemin complet de l'image en paramètre ---
+                url_image = await self.upload_image_to_bucket(self.selected_image_path)
+
+                if url_image:
+                    update_payload["image"] = url_image
+                    print(f"[DEBUG] URL d'image récupérée avec succès : {url_image}")
+                else:
+                    print("[DEBUG] Échec du téléversement de l'image, l'URL est vide.")
+                    self.cp.show_alert("L'image n'a pas pu être envoyée sur le serveur.", ft.Icons.WARNING,
+                                       ft.Colors.ORANGE)
+
+            print(
+                f"[DEBUG] Envoi du PATCH à Supabase pour l'ID {self.selected_product_id} avec le payload : {update_payload}")
+
+            # Mise à jour partielle (PATCH) sur Supabase
             await supabase_request_async(
                 access_token=self.access_token,
                 tenant_id=self.tenant_id,
-                table_name="products", method="PATCH",
-                params={"id": f"eq.{product_id}", **update_payload}
-            )
-            await supabase_request_async(
-                access_token=self.access_token,
-                tenant_id=self.tenant_id,
-                table_name="stock_tampons",
+                table_name="products",
                 method="PATCH",
-                params={"id": f"eq.{product_id}", **update_payload}
+                params={"id": f"eq.{int(self.selected_product_id)}"},
+                data=update_payload
             )
 
+            print("[DEBUG] Mise à jour Supabase réussie. Rechargement des données...")
+
+            # Fermeture du panneau et rafraîchissement complet
             self.cp.hide_container(self.cp.st_container)
             await self.load_products_data()
             self.cp.show_alert("Produit mis à jour avec succès !", ft.Icons.CHECK_CIRCLE, ft.Colors.GREEN)
-        except Exception as ex:
-            print(f"Erreur de modification produit : {ex}")
-            self.cp.show_alert("Erreur lors de la modification.", ft.Icons.ERROR, ft.Colors.RED)
 
-        self.loader.visible = False
-        self.cp.page.update()
+        except Exception as ex:
+            print(f"[ERREUR CRITIQUE] save_edit_product : {ex}")
+            self.cp.show_alert(f"Erreur lors de la mise à jour : {str(ex)}", ft.Icons.ERROR, ft.Colors.RED)
+        finally:
+            self.loader.visible = False
+            self.cp.page.update()
 
     # --- Import Excel ---
     def on_excel_file_picked(self, e: ft.FilePickerResultEvent):
@@ -615,42 +876,400 @@ class Products(ft.Container):
             success_count = 0
 
             for row in sheet.iter_rows(min_row=2, values_only=True):
+                # Sécurité : Si la ligne est vide ou si la désignation (colonne 1) est absente
                 if not row or row[0] is None:
                     continue
 
-                payload = {
+                designation = str(row[0]).strip()
+                product_type = str(row[1]).strip() if row[1] else "Général"
+                price_buy = float(row[2]) if row[2] is not None else 0.0
+                price = float(row[3]) if row[3] is not None else 0.0
+                quantite_excel = int(row[4]) if row[4] is not None else 0
+
+                # 1. Détermination de la répartition des stocks selon le choix de l'utilisateur
+                stock_principal = quantite_excel
+                stock_secondaire = 0
+
+                # 2. Préparation des deux configurations de base (sans l'id)
+                payload_destination_choisie = {
                     "tenant_id": self.tenant_id,
-                    "designation": str(row[0]).strip(),
-                    "product_type": str(row[1]).strip() if row[1] else "Général",
-                    "price_buy": float(row[2]) if row[2] is not None else 0.0,
-                    "price": float(row[3]) if row[3] is not None else 0.0,
-                    "stock": int(row[4]) if row[4] is not None else 0,
+                    "designation": designation,
+                    "product_type": product_type,
+                    "price_buy": price_buy,
+                    "price": price,
+                    "stock": stock_principal,
                     "image": DEFAULT_IMAGE
                 }
 
+                payload_destination_secondaire = {
+                    "tenant_id": self.tenant_id,
+                    "designation": designation,
+                    "product_type": product_type,
+                    "price_buy": price_buy,
+                    "price": price,
+                    "stock": stock_secondaire,
+                    "image": DEFAULT_IMAGE
+                }
+
+                # 3. Routage dynamique des tables d'écriture
+                if self.selected_stock_destination == "products":
+                    table_1, payload_1 = "products", payload_destination_choisie
+                    table_2, payload_2 = "stock_tampons", payload_destination_secondaire
+                else:
+                    table_1, payload_1 = "stock_tampons", payload_destination_choisie
+                    table_2, payload_2 = "products", payload_destination_secondaire
+
+                # 4. Premier INSERT : On laisse PostgreSQL générer l'id auto-incrémenté (serial)
+                res_1 = await supabase_request_async(
+                    access_token=self.access_token,
+                    tenant_id=self.tenant_id,
+                    table_name=table_1,
+                    method="POST",
+                    data=payload_1
+                )
+
+                # Extraction de l'ID généré par la première table
+                generated_id = None
+                if isinstance(res_1, list) and len(res_1) > 0:
+                    generated_id = res_1[0].get("id")
+                elif isinstance(res_1, dict):
+                    generated_id = res_1.get("id")
+
+                if not generated_id:
+                    print(f"⚠️ Impossible de récupérer l'ID généré pour {designation}. Ligne ignorée.")
+                    continue
+
+                # 5. Deuxième INSERT : On force l'id pour qu'il s'aligne exactement sur le premier
+                payload_2["id"] = int(generated_id)
+
                 await supabase_request_async(
                     access_token=self.access_token,
                     tenant_id=self.tenant_id,
-                    table_name="products",
+                    table_name=table_2,
                     method="POST",
-                    data=payload
+                    data=payload_2
                 )
-                await supabase_request_async(
-                    access_token=self.access_token,
-                    tenant_id=self.tenant_id,
-                    table_name="stock_tampons",
-                    method="POST",
-                    data=payload
-                )
+
                 success_count += 1
 
+            # Rechargement des données sur l'interface graphique
             await self.load_products_data()
-            self.cp.show_alert(f"Importation réussie : {success_count} produits intégrés !", ft.Icons.CHECK_CIRCLE,
+            self.cp.show_alert(f"Importation réussie : {success_count} produits synchronisés !", ft.Icons.CHECK_CIRCLE,
                                ft.Colors.GREEN)
+
         except Exception as ex:
             print(f"Erreur d'importation Excel : {ex}")
             self.cp.show_alert("Fichier Excel invalide ou corrompu.", ft.Icons.ERROR, ft.Colors.RED)
 
         self.loader.visible = False
         self.cp.page.update()
-        
+
+    def generate_excel_template(self, e):
+        """Initialise le sélecteur pour enregistrer le fichier modèle Excel structuré."""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+        except ImportError:
+            self.cp.show_alert("La bibliothèque 'openpyxl' est requise pour générer le modèle.", ft.Icons.ERROR,
+                               ft.Colors.RED)
+            return
+
+        def save_file_result(file_picker_event: ft.FilePickerResultEvent):
+            if not file_picker_event.path:
+                return
+
+            try:
+                # Création du classeur Excel
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "Modèle Import Produits"
+
+                # En-têtes attendus par ton script d'importation
+                headers = ["Désignation *", "Catégorie", "Prix d'achat", "Prix de vente *", "Quantité en stock"]
+                ws.append(headers)
+
+                # Stylisation rapide des en-têtes pour faire professionnel
+                header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+                header_fill = PatternFill(start_color="4F46E5", end_color="4F46E5",
+                                          fill_type="solid")  # Couleur MAIN_COLOR (Indigo)
+                center_alignment = Alignment(horizontal="center", vertical="center")
+
+                for col_num, header in enumerate(headers, 1):
+                    cell = ws.cell(row=1, column=col_num)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = center_alignment
+                    # Ajustement de la largeur des colonnes
+                    ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 22
+
+                # Exemple de ligne factice pour guider l'utilisateur
+                ws.append(["Exemple Produit A", "Boisson", 500, 800, 15])
+
+                # Sauvegarde à l'emplacement choisi par l'utilisateur
+                wb.save(file_picker_event.path)
+                self.cp.show_alert("Modèle Excel généré avec succès !", ft.Icons.CHECK_CIRCLE, ft.Colors.GREEN)
+
+            except Exception as ex:
+                print(f"Erreur lors de la création du modèle : {ex}")
+                self.cp.show_alert(f"Erreur : {ex}", ft.Icons.ERROR, ft.Colors.RED)
+
+        # Utilisation d'un FilePicker temporaire dédié à la sauvegarde
+        save_picker = ft.FilePicker(on_result=save_file_result)
+        self.cp.page.overlay.append(save_picker)
+        self.cp.page.update()
+
+        # Ouvre la boîte de dialogue de sauvegarde de fichier
+        save_picker.save_file(
+            file_name="modele_import_produits.xlsx",
+            allowed_extensions=["xlsx"]
+        )
+
+    def open_import_destination_modal(self, e):
+        """Ouvre l'AlertDialog de choix d'application des stocks."""
+        def confirm_destination(destination_table):
+            self.selected_stock_destination = destination_table
+            self.import_dialog.open = False
+            self.cp.page.update()
+            # Déclenche l'explorateur de fichiers d'importation
+            self.excel_picker.pick_files(allowed_extensions=["xlsx"])
+
+        self.import_dialog = ft.AlertDialog(
+            title=ft.Text("Destination de l'importation Excel", font_family="PEB", size=18),
+            content=ft.Text(
+                "Sélectionnez la table dans laquelle les quantités en stock de votre fichier Excel seront appliquées.\n\n"
+                "Note : Les références seront créées simultanément dans les deux tables, mais la table secondaire démarrera avec un stock à 0.",
+                size=14, font_family="PPM"
+            ),
+            actions=[
+                ft.Row([
+                    ft.ElevatedButton(
+                        "Stock Boutique",
+                        icon=ft.Icons.STORE_ROUNDED,
+                        style=ft.ButtonStyle(color="white", bgcolor="indigo"),
+                        on_click=lambda _: confirm_destination("products")
+                    ),
+                    ft.ElevatedButton(
+                        "Stock Tampon (Dépôt)",
+                        icon=ft.Icons.ALL_INBOX_ROUNDED,
+                        style=ft.ButtonStyle(color="white", bgcolor="teal"),
+                        on_click=lambda _: confirm_destination("stock_tampons")
+                    ),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=15)
+            ],
+            actions_alignment=ft.MainAxisAlignment.CENTER
+        )
+
+        self.cp.page.overlay.append(self.import_dialog)
+        self.import_dialog.open = True
+        self.cp.page.update()
+
+    async def open_entree_tampon_window(self, e):
+        """Ouvre la fenêtre de gestion des entrées / arrivages pour le stock tampon"""
+        # Configuration des dimensions de la fenêtre de Flet (st_container ou similaire)
+        self.cp.st_container.content.width = 650
+        self.cp.st_container.content.height = 600
+
+        # 1. Remplir le Dropdown avec les produits disponibles localement
+        self.tampon_dropdown_produits.options.clear()
+        if hasattr(self, 'liste_des_produits') and self.liste_des_produits:
+            for p in self.liste_des_produits:
+                p_id = str(p.get('produit_id'))
+                p_nom = str(p.get('designation', 'Inconnu')).upper()
+                self.tampon_dropdown_produits.options.append(
+                    ft.dropdown.Option(key=p_id, text=p_nom)
+                )
+
+        # Réinitialisation du panier local et du formulaire
+        self.tampon_panier_items.clear()
+        self.tampon_panier_table.rows.clear()
+        self.tampon_qty_field.value = ""
+
+        # 2. Construction de la structure de l'interface
+        form_content = ft.Column(
+            expand=True,
+            spacing=15,
+            controls=[
+                ft.Container(
+                    padding=20, bgcolor="white",
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text("Nouvel Arrivage - Stock Tampon", size=18, font_family="PEB"),
+                            ft.Container(
+                                content=ft.Image(resource_path("assets/icons/black/x.svg"), width=20, height=20),
+                                on_click=lambda _: self.cp.hide_container(self.cp.st_container)
+                            )
+                        ]
+                    ),
+                ),
+                ft.Divider(height=1, thickness=1),
+                # Zone de saisie
+                ft.Container(
+                    padding=20,
+                    content=ft.Row(
+                        controls=[
+                            self.tampon_dropdown_produits,
+                            self.tampon_qty_field,
+                            ft.IconButton(
+                                icon=ft.Icons.ADD_CIRCLE_ROUNDED,
+                                icon_color=MAIN_COLOR,
+                                icon_size=36,
+                                tooltip="Ajouter au panier",
+                                on_click=self.add_item_to_tampon_panier
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=10
+                    )
+                ),
+                # Zone de la DataTable (Panier)
+                ft.Container(
+                    expand=True, padding=20,
+                    content=ft.ListView(expand=True, controls=[self.tampon_panier_table])
+                ),
+                # Zone du bouton de validation au bas
+                ft.Divider(height=1, thickness=1),
+                ft.Container(
+                    padding=20,
+                    alignment=ft.alignment.center,
+                    content=MyButton(
+                        "Valider le panier d'entrées",
+                        resource_path("assets/icons/white/check.svg"),
+                        lambda e: self.run_async_in_thread(self.validate_tampon_panier(e))
+                    )
+                )
+            ]
+        )
+
+        self.cp.st_form.content = form_content
+        self.cp.show_container(self.cp.st_container)
+        self.cp.page.update()
+
+    def add_item_to_tampon_panier(self, e):
+        """Ajoute temporairement un produit et sa quantité dans le tableau visuel"""
+        p_id = self.tampon_dropdown_produits.value
+        qty_str = self.tampon_qty_field.value
+
+        if not p_id:
+            self.cp.show_alert("Veuillez sélectionner un produit.", ft.Icons.WARNING, ft.Colors.ORANGE)
+            return
+        if not qty_str or not qty_str.isdigit() or int(qty_str) <= 0:
+            self.cp.show_alert("Veuillez saisir une quantité positive valide.", ft.Icons.WARNING, ft.Colors.ORANGE)
+            return
+
+        qty = int(qty_str)
+        # Récupérer le nom textuel du produit sélectionné dans le dropdown
+        p_name = next(opt.text for opt in self.tampon_dropdown_produits.options if opt.key == p_id)
+
+        # Vérifier si le produit est déjà présent dans le panier pour cumuler la quantité
+        # Remplacer NULL par None à la fin de la fonction next()
+        existing_item = next((item for item in self.tampon_panier_items if item['id_produit'] == p_id), None)
+        if existing_item:
+            existing_item['qte'] += qty
+        else:
+            self.tampon_panier_items.append({
+                'id_produit': p_id,
+                'designation': p_name,
+                'qte': qty
+            })
+
+        # Rafraîchir la DataTable
+        self.render_tampon_panier_table()
+
+        # Réinitialiser uniquement le champ quantité pour la saisie suivante
+        self.tampon_qty_field.value = ""
+        self.cp.page.update()
+
+    def render_tampon_panier_table(self):
+        """Redessine les lignes de la DataTable du panier"""
+        self.tampon_panier_table.rows.clear()
+
+        for index, item in enumerate(self.tampon_panier_items):
+            self.tampon_panier_table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(item['designation'], font_family="PPM")),
+                        ft.DataCell(ft.Text(str(item['qte']), font_family="PEB")),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Image(
+                                    resource_path("assets/icons/grey/trash-2.svg"), width=18, height=18,
+                                ),
+                                on_click=lambda e, idx=index: self.remove_item_from_tampon_panier(idx)
+                            ),
+                        )
+                    ]
+                )
+            )
+
+    def remove_item_from_tampon_panier(self, index):
+        """Retire un élément du panier local"""
+        if 0 <= index < len(self.tampon_panier_items):
+            self.tampon_panier_items.pop(index)
+            self.render_tampon_panier_table()
+            self.cp.page.update()
+
+    async def validate_tampon_panier(self, e):
+        """Enregistre en bloc les entrées et met à jour la table stock_tampons"""
+        if not self.tampon_panier_items:
+            self.cp.show_alert("Le panier est vide.", ft.Icons.WARNING, ft.Colors.ORANGE)
+            return
+
+        self.loader.visible = True
+        self.cp.page.update()
+
+        try:
+            for item in self.tampon_panier_items:
+                prod_id = int(item['id_produit'])
+                quantite_entree = item['qte']
+
+                # 1. Récupérer le stock tampon actuel du produit pour faire le cumul exact
+                params = {'select': 'stock', 'id': f'eq.{prod_id}'}
+                res_tampon = await supabase_request_async(
+                    access_token=self.access_token, tenant_id=self.tenant_id,
+                    table_name="stock_tampons", method="GET", params=params
+                )
+
+                current_stock_tampon = 0
+                if res_tampon and len(res_tampon) > 0:
+                    current_stock_tampon = int(res_tampon[0].get('stock') or 0)
+
+                # 2. Calculer et appliquer le nouveau stock tampon
+                new_stock_tampon = current_stock_tampon + quantite_entree
+
+                await supabase_request_async(
+                    access_token=self.access_token, tenant_id=self.tenant_id,
+                    table_name="stock_tampons", method="PATCH",
+                    params={"id": f"eq.{prod_id}"},
+                    data={"stock": new_stock_tampon}
+                )
+
+                # 3. Insérer la ligne d'historique correspondante dans la nouvelle table entrees_tampons
+                payload_entree_tampon = {
+                    "tenant_id": self.tenant_id,
+                    "id_produit": prod_id,
+                    "qte": quantite_entree,
+                    "cree_par": self.user_name.upper() if hasattr(self, 'user_name') else "ADMIN"
+                }
+
+                await supabase_request_async(
+                    access_token=self.access_token, tenant_id=self.tenant_id,
+                    table_name="entrees_tampons", method="POST",
+                    data=payload_entree_tampon
+                )
+
+            # 4. Succès total et rechargement de la vue générale
+            self.cp.hide_container(self.cp.st_container)
+            await self.load_products_data()  # Recharge tes tableaux de bord principaux
+            self.cp.show_alert("Arrivage en stock tampon enregistré avec succès !", ft.Icons.CHECK_CIRCLE,
+                               ft.Colors.GREEN)
+
+        except Exception as ex:
+            print(f"Erreur validation panier tampon : {ex}")
+            self.cp.show_alert("Une erreur est survenue durant l'enregistrement.", ft.Icons.ERROR, ft.Colors.RED)
+        finally:
+            self.loader.visible = False
+            self.cp.page.update()
+
+
