@@ -227,7 +227,37 @@ class Reports(ft.Container):
                 
             ]
         )
-               
+        self.has_cashier_rights = self.role == "cashier"
+        self.cloture_button = MyButton(
+            "Clôture",
+            resource_path("assets/icons/white/wallet.svg"),
+            lambda e: self.run_async_in_thread(self.open_cloture_window(e))
+        )
+        self.stock_journalier_button = MyButton(
+            "Stocks Journaliers",
+            resource_path("assets/icons/white/table-of-contents.svg"),  # ou une autre icône blanche de votre choix
+            lambda e: self.run_async_in_thread(self.open_stock_journalier_window(e))
+        )
+        self.cloture_button.visible = self.has_cashier_rights
+
+        # ================= ZONE STOCK JOURNALIER =================
+        self.stock_filter_date = ft.TextField(
+            **config_tf_style, width=150, hint_text="AAAA-MM-JJ", label="Date (AAAA-MM-JJ)",
+            value=date.today().strftime("%Y-%m-%d")
+        )
+        self.stock_table = ft.DataTable(
+            **datatable_style,
+            columns=[
+                ft.DataColumn(ft.Text("Désignation")),
+                ft.DataColumn(ft.Text("Type")),
+                ft.DataColumn(ft.Text("Init")),
+                ft.DataColumn(ft.Text("+ Entrées")),
+                ft.DataColumn(ft.Text("- Ventes")),
+                ft.DataColumn(ft.Text("Fin")),
+            ]
+        )
+        self.current_stock_datas = []  # Stockage local pour l'export PDF
+
         self.main_layout = ft.Container(
             **stat_style,
             content=ft.Column(
@@ -245,10 +275,8 @@ class Reports(ft.Container):
                                         ft.Row(
                                             controls=[
                                                 ft.Text("Rapports journaliers", size=16, font_family="PEB"),
-                                                MyButton(
-                                                    "Clôture",
-                                                    resource_path("assets/icons/white/wallet.svg"),
-                                                    lambda e: self.run_async_in_thread(self.open_cloture_window(e))
+                                                ft.Row(
+                                                    controls=[self.cloture_button, self.stock_journalier_button]
                                                 )
                                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                                         ),
@@ -375,6 +403,7 @@ class Reports(ft.Container):
             expand=True, alignment=ft.alignment.center, bgcolor="white",
             content=ft.ProgressRing(width=50, height=50, color=MAIN_COLOR)
         )
+
         self.content = ft.Stack(
             expand=True, alignment=ft.alignment.center,
             controls=[
@@ -813,7 +842,8 @@ class Reports(ft.Container):
             val_om=int(self.r_om),
             val_total=int(self.r_total),
             montant_physique=montant_physique,
-            solde_awaited=self.r_awaited
+            solde_awaited=self.r_awaited,
+            montant_versement=int(self.report_versement.value)
         )
 
         if not url_du_rapport:
@@ -847,24 +877,27 @@ class Reports(ft.Container):
 
         except Exception as ex:
             self.cp.show_alert(f"Erreur système : {ex}", ft.Icons.INFO_OUTLINE, ft.Colors.RED)
-    
-    def generer_pdf_cloture(self, solde_initial, val_cash, val_momo, val_om, val_total, montant_physique, solde_awaited):
+
+    def generer_pdf_cloture(self, solde_initial, val_cash, val_momo, val_om, val_total, montant_physique, solde_awaited,
+                            montant_versement):
         """Génère le rapport PDF de clôture (Z-Report) détaillé après succès et l'envoie sur Supabase"""
         try:
+            from datetime import datetime
+
             # Configuration du fichier de sortie
             date_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
             nom_fichier = f"Z_Report_{date_str}.pdf"
-            
+
             # Chemin d'enregistrement par défaut (Dossier Téléchargements)
             chemin_sauvegarde = os.path.join(os.path.expanduser("~"), "Downloads", nom_fichier)
 
             # Marges et structure de la page
             doc = SimpleDocTemplate(
-                chemin_sauvegarde, 
-                pagesize=letter, 
-                rightMargin=40, 
-                leftMargin=40, 
-                topMargin=40, 
+                chemin_sauvegarde,
+                pagesize=letter,
+                rightMargin=40,
+                leftMargin=40,
+                topMargin=40,
                 bottomMargin=40
             )
             story = []
@@ -872,161 +905,190 @@ class Reports(ft.Container):
 
             # Styles personnalisés
             title_style = ParagraphStyle(
-                'Title', 
-                parent=styles['Heading1'], 
-                fontSize=22, 
-                leading=26, 
-                textColor=colors.HexColor("#1A237E"), 
+                'Title',
+                parent=styles['Heading1'],
+                fontSize=22,
+                leading=26,
+                textColor=colors.HexColor("#1A237E"),
                 alignment=1
             )
             section_style = ParagraphStyle(
-                'Section', 
-                parent=styles['Heading2'], 
-                fontSize=14, 
-                leading=18, 
-                textColor=colors.HexColor("#1A237E"), 
-                spaceBefore=15, 
+                'Section',
+                parent=styles['Heading2'],
+                fontSize=14,
+                leading=18,
+                textColor=colors.HexColor("#1A237E"),
+                spaceBefore=15,
                 spaceAfter=5
             )
             normal_style = styles['Normal']
             bold_style = ParagraphStyle('Bold', parent=normal_style, fontName='Helvetica-Bold')
-            bold_white_style = ParagraphStyle('BoldWhite', parent=normal_style, fontName='Helvetica-Bold', textColor=colors.white)
+            bold_white_style = ParagraphStyle('BoldWhite', parent=normal_style, fontName='Helvetica-Bold',
+                                              textColor=colors.white)
 
             # 1. ENTÊTE DU PDF
             story.append(Paragraph("Postly - RAPPORT DE CLÔTURE JOURNALIER", title_style))
             story.append(Spacer(1, 15))
-            
+
             # Informations générales (Date, Établissement, Caissier)
-            story.append(Paragraph(f"<b>Date de traitement :</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
+            story.append(
+                Paragraph(f"<b>Date de traitement :</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
             story.append(Paragraph(f"<b>Établissement :</b> {self.tenant_name}", normal_style))
             story.append(Paragraph(f"<b>Caissier(e) :</b> {self.user_name.upper()}", normal_style))
             story.append(Spacer(1, 15))
 
             # 2. SECTION : FLUX COMPTABLES & REVENUS (Ventes & Mode de paiement)
             story.append(Paragraph("1. Résumé des Ventes et Flux Electroniques", section_style))
-            
+
             # Calcul des entrées mobiles globales pour le rapport
             total_mobile = val_momo + val_om
 
             data_flux = [
-                [Paragraph("<b>Indicateur de Flux</b>", normal_style), Paragraph("<b>Montant enregistré</b>", bold_white_style)],
+                # CORRECTION VISUELLE : bold_white_style appliqué sur les deux en-têtes pour écrire en BLANC
+                [Paragraph("<b>Indicateur de Flux</b>", bold_white_style),
+                 Paragraph("<b>Montant enregistré</b>", bold_white_style)],
                 [Paragraph("Entrées Ventes en Cash (Espèces)", normal_style), f"{format_milliers_fr(val_cash)} XAF"],
-                [Paragraph("Entrées Paiements Mobiles (Orange Money / MoMo)", normal_style), f"{format_milliers_fr(total_mobile)} XAF"],
-                [Paragraph("<b>TOTAL DES VENTES DU JOUR (Tout mode)</b>", bold_style), Paragraph(f"<b>{format_milliers_fr(val_total)} XAF</b>", bold_style)]
+                [Paragraph("Entrées Paiements Mobiles (Orange Money / MoMo)", normal_style),
+                 f"{format_milliers_fr(total_mobile)} XAF"],
+                [Paragraph("<b>TOTAL DES VENTES DU JOUR (Tout mode)</b>", bold_style),
+                 Paragraph(f"<b>{format_milliers_fr(val_total)} XAF</b>", bold_style)]
             ]
 
             t_flux = Table(data_flux, colWidths=[320, 180])
             t_flux.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (1,0), colors.HexColor("#1A237E")),
-                ('TEXTCOLOR', (0,0), (1,0), colors.whitesmoke),
-                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                ('TOPPADDING', (0,0), (-1,-1), 6),
-                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F9F9F9")]),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+                ('BACKGROUND', (0, 0), (1, 0), colors.HexColor("#1A237E")),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9F9F9")]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
             ]))
             story.append(t_flux)
             story.append(Spacer(1, 15))
 
-            # 3. SECTION : ÉTAT DE LA CAISSE PHYSIQUE (CASH) & ÉCART
-            story.append(Paragraph("2. Contrôle de la Caisse Physique (Cash)", section_style))
-            
+            # 3. SECTION : ÉTAT DE LA CAISSE PHYSIQUE (CASH), VERSEMENT & ÉCART
+            story.append(Paragraph("2. Contrôle de la Caisse Physique (Cash) & Mouvements", section_style))
+
             # Calcul de l'écart (Réel - Attendu)
             ecart = montant_physique - solde_awaited
             if ecart == 0:
                 txt_ecart = "0 XAF (Parfait)"
-                couleur_ecart = colors.HexColor("#2E7D32") # Vert
+                couleur_ecart = colors.HexColor("#2E7D32")  # Vert
             elif ecart > 0:
                 txt_ecart = f"+{format_milliers_fr(ecart)} XAF (Excédent)"
-                couleur_ecart = colors.HexColor("#1565C0") # Bleu
+                couleur_ecart = colors.HexColor("#1565C0")  # Bleu
             else:
                 txt_ecart = f"{format_milliers_fr(ecart)} XAF (Déficit)"
-                couleur_ecart = colors.HexColor("#C62828") # Rouge
+                couleur_ecart = colors.HexColor("#C62828")  # Rouge
 
-            # Structure des données avec correction couleur (Gris de fond, texte Blanc) et intégration des ventes Cash perçues
+            # Calcul du reste net en caisse physique après le retrait de versement déclaré
+            reste_net_en_caisse = montant_physique - montant_versement
+
+            # Structure des données mise à jour avec le montant versé et le reste en caisse
             data_caisse = [
-                [Paragraph("<b>Élément de contrôle</b>", normal_style), Paragraph("<b>Valeur Comptable / Réelle</b>", bold_white_style)],
-                [Paragraph("Solde de départ (Fond de roulement)", normal_style), f"{format_milliers_fr(solde_initial)} XAF"],
+                # CORRECTION VISUELLE : bold_white_style appliqué aussi sur "Élément de contrôle"
+                [Paragraph("<b>Élément de contrôle</b>", bold_white_style),
+                 Paragraph("<b>Valeur Comptable / Réelle</b>", bold_white_style)],
+                [Paragraph("Solde de départ (Fond de roulement)", normal_style),
+                 f"{format_milliers_fr(solde_initial)} XAF"],
                 [Paragraph("Ventes Cash perçues dans la journée", normal_style), f"{format_milliers_fr(val_cash)} XAF"],
-                [Paragraph("Montant Cash Attendu (Départ + Ventes Cash)", normal_style), f"{format_milliers_fr(solde_awaited)} XAF"],
-                [Paragraph("<b>Montant Cash Réel (Déclaré physique)</b>", bold_style), Paragraph(f"<b>{format_milliers_fr(montant_physique)} XAF</b>", bold_style)],
-                [Paragraph("<b>ÉCART DE CAISSE</b>", bold_style), Paragraph(f"<b>{txt_ecart}</b>", ParagraphStyle('Ec', parent=normal_style, fontName='Helvetica-Bold', textColor=couleur_ecart))]
+                [Paragraph("Montant Cash Attendu (Départ + Ventes Cash)", normal_style),
+                 f"{format_milliers_fr(solde_awaited)} XAF"],
+                [Paragraph("Montant Cash Réel Constaté (Physique déclaré)", normal_style),
+                 f"{format_milliers_fr(montant_physique)} XAF"],
+                [Paragraph("<b>ÉCART DE CAISSE CONSTATÉ</b>", bold_style), Paragraph(f"<b>{txt_ecart}</b>",
+                                                                                     ParagraphStyle('Ec',
+                                                                                                    parent=normal_style,
+                                                                                                    fontName='Helvetica-Bold',
+                                                                                                    textColor=couleur_ecart))],
+                # AJOUTS DU VERSEMENT ET DU RESTE APPRÈS EN CAISSE
+                [Paragraph("Montant Versé (Retrait déclaré)", normal_style),
+                 f"{format_milliers_fr(montant_versement)} XAF"],
+                [Paragraph("<b>RESTE NET EN CAISSE (Après versement)</b>", bold_style),
+                 Paragraph(f"<b>{format_milliers_fr(reste_net_en_caisse)} XAF</b>", bold_style)]
             ]
 
             t_caisse = Table(data_caisse, colWidths=[320, 180])
             t_caisse.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (1,0), colors.HexColor("#424242")), # Menu Fond Gris Foncé
-                ('TEXTCOLOR', (0,0), (1,0), colors.white),                # Menu Texte Blanc
-                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                ('TOPPADDING', (0,0), (-1,-1), 6),
-                ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor("#F5F5F5")]), # Alternance Fond Gris Clair / Blanc
-                ('BACKGROUND', (0,-1), (1,-1), colors.HexColor("#E0E0E0")), # Ligne Écart sur fond gris plus prononcé
-                ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+                ('BACKGROUND', (0, 0), (1, 0), colors.HexColor("#424242")),  # Menu Fond Gris Foncé
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -3), [colors.white, colors.HexColor("#F5F5F5")]),  # Lignes standards
+                ('BACKGROUND', (0, 5), (1, 5), colors.HexColor("#E0E0E0")),  # Ligne Écart sur fond gris moyen
+                ('BACKGROUND', (0, -1), (1, -1), colors.HexColor("#EEF2FF")),
+                # Ligne Reste Net sur fond bleu très clair
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
             ]))
             story.append(t_caisse)
-            
-            story.append(Spacer(1, 35))
-            story.append(Paragraph("<i>Note : Ce document fait foi de clôture définitive pour la journée indiquée. Toute anomalie ou écart négatif important doit être justifié auprès de la direction.</i>", normal_style))
+
+            story.append(Spacer(1, 25))
+            story.append(Paragraph(
+                "<i>Note : Ce document fait foi de clôture définitive pour la journée indiquée. Toute anomalie ou écart négatif important doit être justifié auprès de la direction.</i>",
+                normal_style))
 
             # Signatures
             story.append(Spacer(1, 20))
             data_signatures = [
-                [Paragraph("<b>Signature du Caissier</b>", normal_style), Paragraph("<b>Signature du Manager / Visa</b>", normal_style)]
+                [Paragraph("<b>Signature du Caissier</b>", normal_style),
+                 Paragraph("<b>Signature du Manager / Visa</b>", normal_style)]
             ]
             t_signatures = Table(data_signatures, colWidths=[250, 250])
             t_signatures.setStyle(TableStyle([
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 50), 
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 45),
             ]))
             story.append(t_signatures)
 
             # Construction effective du document PDF local
             doc.build(story)
             print(f"Rapport PDF complet généré avec succès dans : {chemin_sauvegarde}")
-            
+
             # ================= ENVOI SUR SUPABASE STORAGE =================
             from services.supabase_client import supabase_admin
-            
+
             with open(chemin_sauvegarde, 'rb') as f:
                 supabase_admin.storage.from_("rapports").upload(
                     path=nom_fichier,
                     file=f,
                     file_options={"content-type": "application/pdf"}
                 )
-            
+
             url_publique = supabase_admin.storage.from_("rapports").get_public_url(nom_fichier)
-            
-            self.cp.show_alert(f"Rapport enregistré localement et archivé sur le Cloud", ft.Icons.FILE_DOWNLOAD_DONE_ROUNDED, ft.Colors.BLUE)
-            
+
+            self.cp.show_alert(f"Rapport enregistré localement et archivé sur le Cloud",
+                               ft.Icons.FILE_DOWNLOAD_DONE_ROUNDED, ft.Colors.BLUE)
+
             return str(url_publique)
 
         except Exception as pdf_ex:
-            print(f"Erreur lors de l'extraction ou de l'upload du PDF de clôture : {pdf_ex}")  
+            print(f"Erreur lors de l'extraction ou de l'upload du PDF de clôture : {pdf_ex}")
             return None
-            
+
     async def open_cloture_window(self, e):
-        # 1. Format ISO STRICT pour Supabase (évite l'erreur 22008)
-        date_iso_supabase = date.today().strftime("%Y-%m-%d") # Génère "2026-06-14"
+        # 1. Format ISO STRICT pour la vérification de la table caisse (type date natif)
+        date_iso_supabase = date.today().strftime("%Y-%m-%d")  # Génère "2026-06-20"
+        # date_iso_supabase = "2026-06-19"
+        # 2. Format d'affichage ET de filtrage correspondant à la colonne text creation_date ("DD/MM/YYYY")
+        date_affichage_fr = convert_date_to_string(date.today())  # Génère "20/06/2026"
+        # date_affichage_fr = '19/06/2026'
 
-        # 2. Format d'affichage pour l'interface Flet
-        date_affichage_fr = convert_date_to_string(date.today()) # Génère "14/06/2026"
-
-        # Vérifier si la ligne de caisse existe déjà pour aujourd'hui
+        # Vérifier si la journée d'aujourd'hui est déjà clôturée dans la table caisse
         check_params = {
             'select': 'id',
             'tenant_id': f'eq.{self.tenant_id}',
-            'date_cloture': f'eq.{date_iso_supabase}'  # <-- ON UTILISE LE FORMAT ISO ICI
+            'date_cloture': f'eq.{date_iso_supabase}'
         }
-        
+
         deja_cloture = await supabase_request_async(
             access_token=self.access_token, tenant_id=self.tenant_id,
             table_name="caisse", method="GET", params=check_params
         )
 
         if deja_cloture and isinstance(deja_cloture, list) and len(deja_cloture) > 0:
-            self.cp.show_alert("La journée d'aujourd'hui est déjà clôturée et verrouillée !", ft.Icons.LOCK_CLOCK_OUTLINED, ft.Colors.ORANGE)
-        
+            self.cp.show_alert("La journée d'aujourd'hui est déjà clôturée et verrouillée !",
+                               ft.Icons.LOCK_CLOCK_OUTLINED, ft.Colors.ORANGE)
+
         else:
             # Récupérer le dernier solde enregistré (le solde fin de la dernière clôture)
             params = {
@@ -1043,29 +1105,29 @@ class Reports(ft.Container):
                 method="GET",
                 params=params
             )
-            
+
             # Déterminer le montant initial
             solde_initial = 0
             if dernier_solde and isinstance(dernier_solde, list) and len(dernier_solde) > 0:
-                solde_initial = (dernier_solde[0].get('montant_fin', 0) or 0) - (dernier_solde[0].get('versement', 0) or 0) 
-            
+                solde_initial = (dernier_solde[0].get('montant_fin', 0) or 0) - (
+                            dernier_solde[0].get('versement', 0) or 0)
+
             self.report_initial_amount.value = f"{format_milliers_fr(solde_initial)}"
             self.report_user.value = self.user_name or "Utilisateur"
-
-            # <-- ON ASSIGNE LE FORMAT FRANÇAIS POUR L'AFFICHAGE ÉCRAN DE L'UTILISATEUR
             self.report_date.value = date_affichage_fr
 
-            # Filtrer les données de la journée localement (dépend du format de 'creation_date')
-            # Si 'creation_date' dans ton dictionnaire de ventes est en format FR, utilise date_affichage_fr
-            # Si c'est au format ISO, utilise date_iso_supabase
+            # Initialisation des compteurs financiers
             val_cash = 0
             val_om = 0
             val_momo = 0
             val_total = 0
 
+            # Filtrage des ventes du jour (Aligné sur le format DD/MM/YYYY présent dans table_des_ventes)
             if hasattr(self, 'table_des_ventes') and self.table_des_ventes:
-                # Modifie ici selon le format stocké dans 'table_des_ventes'
-                filtered_date_datas = list(filter(lambda x: date_iso_supabase == x.get('creation_date')[:10] if x.get('creation_date') else False, self.table_des_ventes))
+                filtered_date_datas = list(filter(
+                    lambda x: date_affichage_fr == x.get('creation_date')[:10] if x.get('creation_date') else False,
+                    self.table_des_ventes
+                ))
 
                 if filtered_date_datas and len(filtered_date_datas) > 0:
                     val_cash = filtered_date_datas[0].get('total_cash', 0) or 0
@@ -1073,17 +1135,18 @@ class Reports(ft.Container):
                     val_momo = filtered_date_datas[0].get('total_momo', 0) or 0
                     val_total = filtered_date_datas[0].get('total_ventes', 0) or 0
 
-            # ... Reste du code de ton fichier inchangé ...
-
+            # Reconstruction dynamique de la Datafile d'affichage des modes
             self.report_table.rows.clear()
             rows = [
-                ft.DataRow(cells=[ft.DataCell(ft.Text("Momo")), ft.DataCell(ft.Text(format_milliers_fr(val_momo)))], color=BG_COLOR),
+                ft.DataRow(cells=[ft.DataCell(ft.Text("Momo")), ft.DataCell(ft.Text(format_milliers_fr(val_momo)))],
+                           color=BG_COLOR),
                 ft.DataRow(cells=[ft.DataCell(ft.Text("OM")), ft.DataCell(ft.Text(format_milliers_fr(val_om)))]),
-                ft.DataRow(cells=[ft.DataCell(ft.Text("Cash")), ft.DataCell(ft.Text(format_milliers_fr(val_cash)))], color=BG_COLOR)
+                ft.DataRow(cells=[ft.DataCell(ft.Text("Cash")), ft.DataCell(ft.Text(format_milliers_fr(val_cash)))],
+                           color=BG_COLOR)
             ]
             for row in rows:
                 self.report_table.rows.append(row)
-            
+
             # Remplissage des totaux à l'écran
             self.report_total_vente.value = format_milliers_fr(val_total)
             self.report_cash.value = format_milliers_fr(val_cash)
@@ -1092,7 +1155,7 @@ class Reports(ft.Container):
             solde_awaited = int(solde_initial) + int(val_cash)
             self.report_solde_awaited.value = format_milliers_fr(solde_awaited)
 
-            # Pré-remplir le champ de saisie du solde réel
+            # Les TextFields d'entrée utilisateur (déjà instanciés dans le __init__) reçoivent leurs valeurs de départ
             self.report_solde_reel.value = str(solde_awaited)
             self.report_versement.value = "0"
 
@@ -1119,15 +1182,17 @@ class Reports(ft.Container):
                 ft.Row(
                     [
                         ft.Row(
-                            controls=[ft.Image(resource_path("assets/icons/grey/calendar-days.svg"), width=16, height=16),
-                                      ft.Text("Date du jour", size=14, font_family='PPI', color="grey")]),
+                            controls=[
+                                ft.Image(resource_path("assets/icons/grey/calendar-days.svg"), width=16, height=16),
+                                ft.Text("Date du jour", size=14, font_family='PPI', color="grey")]),
                         self.report_date
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Montant départ", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Montant départ", size=14, font_family='PPI', color="grey")]),
                         self.report_initial_amount
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
@@ -1138,36 +1203,41 @@ class Reports(ft.Container):
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Total ventes du jour", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Total ventes du jour", size=14, font_family='PPI', color="grey")]),
                         self.report_total_vente
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Total ventes cash du jour", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Total ventes cash du jour", size=14, font_family='PPI', color="grey")]),
                         self.report_cash
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Montant final attendu", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Montant final attendu", size=14, font_family='PPI', color="grey")]),
                         self.report_solde_awaited
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Solde final réel", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Solde final réel", size=14, font_family='PPI', color="grey")]),
                         self.report_solde_reel
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
                 ft.Row(
                     [
-                        ft.Row(controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
-                                         ft.Text("Versement", size=14, font_family='PPI', color="grey")]),
+                        ft.Row(
+                            controls=[ft.Image(resource_path("assets/icons/grey/badge-cent.svg"), width=16, height=16),
+                                      ft.Text("Versement", size=14, font_family='PPI', color="grey")]),
                         self.report_versement
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                 ),
@@ -1179,12 +1249,208 @@ class Reports(ft.Container):
 
             self.cp.show_container(self.cp.cloture_container)
             self.cp.page.update()
-            
-            # pour pdf
+
+            # Mémorisation des totaux du jour pour l'édition ultérieure du PDF
             self.r_initial = solde_initial
             self.r_awaited = solde_awaited
             self.r_cash = val_cash
             self.r_momo = val_momo
             self.r_om = val_om
-            self.r_total = val_total       
-    
+            self.r_total = val_total
+
+    async def open_stock_journalier_window(self, e):
+        """Prépare et affiche la fenêtre modale du stock journalier"""
+        # Configuration des dimensions du conteneur parent global
+
+        self.cp.st_container.content.width = 850
+        self.cp.st_container.content.height = 700
+
+        # Construction dynamique du formulaire à injecter
+        stock_form = ft.Column(
+            expand=True,
+            spacing=15,
+            controls=[
+                ft.Container(
+                    padding=20, bgcolor="white",
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text("Suivi des Stocks Journaliers", size=20, font_family="PEB"),
+                            ft.Container(
+                                content=ft.Image(resource_path("assets/icons/black/x.svg"), width=20, height=20),
+                                on_click=lambda _: self.cp.hide_container(self.cp.st_container)
+                            )
+                        ]
+                    ),
+                ),
+                ft.Divider(height=1, thickness=1),
+                ft.Container(
+                    padding=20,
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    self.stock_filter_date,
+                                    ft.Container(
+                                        border_radius=6, padding=12, alignment=ft.alignment.center,
+                                        border=ft.border.all(1, "grey"), bgcolor=BG_COLOR,
+                                        content=ft.Image(src=resource_path("assets/icons/grey/funnel.svg"), width=16,
+                                                         height=16),
+                                        on_click=lambda e: self.run_async_in_thread(self.load_stock_journalier())
+                                    ),
+                                ], spacing=10
+                            ),
+                            MyButton(
+                                "Exporter PDF",
+                                resource_path("assets/icons/white/file-download.svg"),
+                                # Ajustez selon vos icônes existantes
+                                lambda e: self.exporter_stock_pdf()
+                            )
+                        ]
+                    )
+                ),
+                ft.Container(
+                    expand=True,
+                    content=ft.ListView(expand=True, controls=[self.stock_table])
+                )
+            ]
+        )
+        self.cp.st_form.content = stock_form
+        self.cp.show_container(self.cp.st_container)
+        self.cp.page.update()
+
+        # Premier chargement automatique des données
+        await self.load_stock_journalier()
+
+    async def load_stock_journalier(self):
+        """Récupère les données depuis la vue personnalisée PostgreSQL"""
+        target_date = self.stock_filter_date.value or date.today().strftime("%Y-%m-%d")
+
+        params = {
+            'select': '*',
+            'tenant_id': f'eq.{self.tenant_id}',
+            'date_cloture': f'eq.{target_date}'
+        }
+
+        # Requête asynchrone vers votre nouvelle vue PostgreSQL
+        records = await supabase_request_async(
+            access_token=self.access_token,
+            tenant_id=self.tenant_id,
+            table_name="vue_stock_journalier_details",
+            method="GET",
+            params=params
+        )
+
+        self.stock_table.rows.clear()
+        self.current_stock_datas = records or []
+
+        if records and isinstance(records, list):
+            for item in records:
+                # Récupération sécurisée des colonnes de la vue SQL
+                designation = str(item.get('designation_produit', 'Produit inconnu')).upper()
+                product_type = str(item.get('type_produit', 'N/A'))
+
+                self.stock_table.rows.append(
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(designation, font_family="PPM", size=13)),
+                            ft.DataCell(ft.Text(product_type, size=13)),
+                            ft.DataCell(ft.Text(str(item.get('stock_debut', 0)), text_align=ft.TextAlign.RIGHT)),
+                            ft.DataCell(ft.Text(f"+ {item.get('stock_entree', 0)}", color=ft.Colors.GREEN_700)),
+                            ft.DataCell(ft.Text(f"- {item.get('stock_vendu', 0)}", color=ft.Colors.RED_700)),
+                            ft.DataCell(ft.Text(str(item.get('stock_fin', 0)), font_family="PEB",
+                                                text_align=ft.TextAlign.RIGHT)),
+                        ]
+                    )
+                )
+        else:
+            # Ligne vide informative si aucun historique n'est trouvé pour ce jour
+            self.stock_table.rows.append(
+                ft.DataRow(cells=[ft.DataCell(ft.Text("Aucun mouvement enregistré pour cette date.")),
+                                  *[ft.DataCell(ft.Text(""))] * 5])
+            )
+
+        self.cp.page.update()
+
+    def exporter_stock_pdf(self):
+        """Génère un fichier PDF ReportLab basé sur les données actuellement affichées"""
+        if not self.current_stock_datas:
+            self.cp.show_alert("Aucune donnée à exporter.", ft.Icons.WARNING_ROUNDED, ft.Colors.ORANGE)
+            return
+
+        try:
+            date_cible = self.stock_filter_date.value
+            nom_fichier = f"Rapport_Stocks_{date_cible}.pdf"
+            chemin_sauvegarde = os.path.join(os.path.expanduser("~"), "Downloads", nom_fichier)
+
+            doc = SimpleDocTemplate(
+                chemin_sauvegarde, pagesize=letter,
+                rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
+            )
+            story = []
+            styles = getSampleStyleSheet()
+
+            # Styles typographiques personnalisés alignés sur ReportLab
+            title_style = ParagraphStyle(
+                'DocTitle', parent=styles['Heading1'], fontSize=20, leading=24,
+                textColor=colors.HexColor("#1A237E"), alignment=1, spaceAfter=15
+            )
+            normal_style = styles['Normal']
+            bold_white = ParagraphStyle('BWhite', parent=normal_style, fontName='Helvetica-Bold',
+                                        textColor=colors.white)
+            bold_style = ParagraphStyle('BText', parent=normal_style, fontName='Helvetica-Bold')
+
+            # 1. En-tête du document
+            story.append(Paragraph(f"INVENTAIRE & ETAT DES STOCKS JOURNALIERS", title_style))
+            story.append(Paragraph(f"<b>Établissement :</b> {self.tenant_name}", normal_style))
+            story.append(Paragraph(f"<b>Date d'analyse :</b> {date_cible}", normal_style))
+            story.append(Paragraph(f"<b>Généré le :</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", normal_style))
+            story.append(Spacer(1, 20))
+
+            # 2. Construction du tableau de données ReportLab
+            table_data = [
+                [
+                    Paragraph("<b>Désignation</b>", bold_white), Paragraph("<b>Type</b>", bold_white),
+                    Paragraph("<b>Stock Init</b>", bold_white), Paragraph("<b>Entrées</b>", bold_white),
+                    Paragraph("<b>Ventes</b>", bold_white), Paragraph("<b>Stock Fin</b>", bold_white)
+                ]
+            ]
+
+            for row in self.current_stock_datas:
+                table_data.append([
+                    Paragraph(str(row.get('designation_produit', '')).upper(), normal_style),
+                    str(row.get('type_produit', '')),
+                    str(row.get('stock_debut', 0)),
+                    f"+ {row.get('stock_entree', 0)}",
+                    f"- {row.get('stock_vendu', 0)}",
+                    Paragraph(f"<b>{row.get('stock_fin', 0)}</b>", bold_style)
+                ])
+
+            # Définition des largeurs de colonnes (Total largeur disponible ~ 532 points)
+            t_stocks = Table(table_data, colWidths=[192, 90, 65, 60, 60, 65])
+            t_stocks.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1A237E")),
+                ('ALIGN', (0, 0), (-1, 0), 'LEFT'),
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # Aligner les chiffres à droite
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9F9F9")]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ]))
+            story.append(t_stocks)
+
+            # Signatures de fin de document
+            story.append(Spacer(1, 40))
+            t_sig = Table([[Paragraph("<b>Visa Responsable Stock</b>", normal_style),
+                            Paragraph("<b>Signature Direction</b>", normal_style)]], colWidths=[266, 266])
+            t_sig.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('BOTTOMPADDING', (0, 0), (-1, -1), 40)]))
+            story.append(t_sig)
+
+            doc.build(story)
+            self.cp.show_alert(f"PDF téléchargé dans votre dossier Téléchargements",
+                               ft.Icons.FILE_DOWNLOAD_DONE_ROUNDED, ft.Colors.GREEN)
+
+        except Exception as pdf_error:
+            print(f"Erreur export PDF : {pdf_error}")
+            self.cp.show_alert(f"Erreur lors de la génération du PDF", ft.Icons.ERROR_OUTLINE, ft.Colors.RED)

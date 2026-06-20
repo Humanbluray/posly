@@ -4,7 +4,7 @@ from utils import (
     
 )
 from styles import switch_style, button_primary_style
-DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/images/19005357.png"
+DEFAULT_IMAGE = "https://hojfmjmrhtsvgfzynelr.supabase.co/storage/v1/object/public/images/no%20image.jpeg"
 
 
 class MyButton(ft.ElevatedButton):

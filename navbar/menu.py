@@ -63,10 +63,6 @@ class NavBar(ft.Column):
             "Paramètres", "assets/icons/grey/bolt.svg", "assets/icons/black/bolt.svg",
             roles[self.role]['Paramètres']
         )
-        self.entries = ItemMenu(
-            "Entrées", "assets/icons/grey/package-check.svg", "assets/icons/black/package-check.svg",
-            roles[self.role]['Entrées']
-        )
         self.users = ItemMenu(
             "Utilisateurs", "assets/icons/grey/users.svg", "assets/icons/black/users.svg",
             roles[self.role]['Utilisateurs']
@@ -77,7 +73,7 @@ class NavBar(ft.Column):
         )
 
         self.children = [
-            self.dashboard, self.sales, self.reports, self.products, self.inventory, self.entries, self.settings, self.users,
+            self.dashboard, self.sales, self.reports, self.products, self.inventory, self.settings, self.users,
             self.billing
         ]
 
@@ -109,7 +105,7 @@ class NavBar(ft.Column):
                             ft.Column(
                                 controls=[
                                     ft.Text("Principal", size=12, font_family="PPM", color=TEXT_SECONDARY, weight=ft.FontWeight.W_600),
-                                    self.dashboard, self.sales, self.reports, self.products, self.inventory, self.entries,
+                                    self.dashboard, self.sales, self.reports, self.products, self.inventory,
                                 ],
                                 spacing=12
                             )
