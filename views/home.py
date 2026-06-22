@@ -268,12 +268,20 @@ class HomeView(ft.View):
         )
 
         # formulaire utilisateur
-        self.st_form = ft.Container(padding=30)
+        self.st_form = ft.Container(padding=30, content=ft.Column(expand=True))
         self.st_container = ft.Container(
             **ct_style,
             content=ft.Container(
                 **intern_ct_style, width=500, height=600,
                 content=self.st_form
+            )
+        )
+        self.edit_ref_form = ft.Container(padding=30, content=ft.Column(expand=True))
+        self.edit_ref_container = ft.Container(
+            **ct_style,
+            content=ft.Container(
+                **intern_ct_style, width=500, height=600,
+                content=self.edit_ref_form
             )
         )
         
@@ -302,6 +310,7 @@ class HomeView(ft.View):
                 controls=[
                     self.main_window, self.data_container, self.details_vente_container,
                     self.valid_basket_container, self.cloture_container, self.st_container,
+                    self.edit_ref_container,
                 ]
             )
         ]

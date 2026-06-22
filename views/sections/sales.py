@@ -139,8 +139,8 @@ class Sales(ft.Container):
             **switch_style, scale=0.8, on_change=self.on_switch_change
         )
         self.table_number = ft.TextField(
-            **config_tf_style, width=50, input_filter=ft.NumbersOnlyInputFilter(),
-            text_align=ft.TextAlign.RIGHT, disabled=True, value="1"
+            **login_style, width=150, input_filter=ft.NumbersOnlyInputFilter(),
+            text_align=ft.TextAlign.RIGHT, disabled=True, value="1", label="N° de table"
         )
         self.right_container = ft.Container(
             **stat_style, width=300,
@@ -518,6 +518,8 @@ class Sales(ft.Container):
             self.table_number.disabled = False
         else:
             self.table_number.disabled = True
+
+        self.cp.page.update()
 
     def annuler_commande(self, e):
         if self.cp.valid_basket_container.visible:
