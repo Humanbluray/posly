@@ -6,6 +6,7 @@
 venv/
 env/
 ENV/
+.venv
 
 # Caches Python (Générés automatiquement en local)
 **/__pycache__/
@@ -15,3 +16,5 @@ ENV/
 # Fichiers de configuration de votre éditeur (VS Code / PyCharm)
 .vscode/
 .idea/.env
+test.py
+
