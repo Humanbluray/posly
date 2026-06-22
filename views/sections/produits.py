@@ -1,7 +1,7 @@
 import flet as ft
 import os, datetime
 import uuid
-from styles import input_style, drop_style, datatable_style, stat_style, login_style
+from styles import input_style, drop_style, datatable_style, stat_style, login_style, switch_style
 from components.components import MyButton
 from utils import (
     ACCESS_TOKEN, TENANT_ID, ROLE, MAIN_COLOR, BG_COLOR, resource_path, format_milliers_fr, CARD_BG, BORDER_COLOR, SHADOW_COLOR
@@ -71,7 +71,7 @@ class Products(ft.Container):
         self.p_name = ft.TextField(**input_style, label="Désignation du produit", width=440,
                                    capitalization=ft.TextCapitalization.WORDS)
         self.p_category = ft.Dropdown(**drop_style, label="Catégorie", width=440, options=[])
-        self.p_price = ft.TextField(**input_style, label="Prix", width=170, input_filter=ft.NumbersOnlyInputFilter(),
+        self.p_price = ft.TextField(**input_style, label="Prix vente", width=170, input_filter=ft.NumbersOnlyInputFilter(),
                                     text_align=ft.TextAlign.RIGHT)
         self.p_price_buy = ft.TextField(**input_style, label="Prix achat", width=170,
                                         input_filter=ft.NumbersOnlyInputFilter(), text_align=ft.TextAlign.RIGHT)
@@ -80,6 +80,15 @@ class Products(ft.Container):
                                     disabled=True)
         self.p_image_name = ft.TextField(**input_style, label="Image sélectionnée", width=300, read_only=True,
                                          hint_text="Aucune image choisie (Image par défaut)")
+
+        self.p_new_category = ft.TextField(
+            **input_style, width=440, capitalization=ft.TextCapitalization.WORDS, disabled=True,
+            label="Nouvelle catégorie",
+        )
+        self.p_switch = ft.Switch(
+            **switch_style, scale=0.7,
+            on_change=self.on_change_category
+        )
 
         #champs du formulaire de modification
         self.selected_product_id = 0
@@ -218,6 +227,22 @@ class Products(ft.Container):
             spacing=10
         )
         self.on_mount()
+
+    def on_change_category(self, e):
+        # En Flet, pour réactiver un champ, on passe .disabled à False
+        if self.p_switch.value:
+            self.p_new_category.disabled = False
+        else:
+            self.p_new_category.disabled = True
+            self.p_new_category.value = ""
+
+        # Mise à jour ciblée du container ou de la page sécurisée
+        try:
+            self.p_new_category.update()
+            self.p_switch.update()
+        except Exception:
+            if self.cp.page:
+                self.cp.page.update()
 
     def build_stats_row(self):
         def create_stat_card(title, text_control, icon):
@@ -380,6 +405,7 @@ class Products(ft.Container):
                 self.cp.show_alert("Veuillez entrer un nombre valide.", ft.Icons.WARNING, ft.Colors.ORANGE)
 
         # Construction du modal
+        self.cp.st_form.content = None
         self.cp.st_container.content.height = 320
         self.cp.st_container.content.width = 400
         self.cp.st_form.content = ft.Column(
@@ -536,8 +562,9 @@ class Products(ft.Container):
         self.p_image_name.value = ""
         self.selected_image_path = None
 
-        self.cp.st_container.content.height = 500
+        self.cp.st_container.content.height = 620
         self.cp.st_container.content.width = 500
+        self.cp.st_form.content = None
 
         self.cp.st_form.content = ft.Column(
             controls=[
@@ -553,7 +580,14 @@ class Products(ft.Container):
                 ft.Column(
                     spacing=10, scroll=ft.ScrollMode.ADAPTIVE,
                     controls=[
-                        self.p_name, self.p_category, self.p_price, self.p_price_buy, self.p_stock,
+                        self.p_name, self.p_category,
+                        ft.Row(
+                            [
+                                ft.Text("Activer nouvelle catégorie", size=14, font_family="PPM"),
+                                self.p_switch
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                        ), self.p_new_category,
+                        self.p_price, self.p_price_buy, self.p_stock,
                         ft.Row([
                             self.p_image_name,
                             ft.IconButton(
@@ -580,7 +614,7 @@ class Products(ft.Container):
             return
 
         self.loader.visible = True
-        self.cp.page.update()
+        self.update()
         final_image_url = DEFAULT_IMAGE
 
         if self.selected_image_path and os.path.exists(self.selected_image_path):
@@ -590,18 +624,24 @@ class Products(ft.Container):
                 with open(self.selected_image_path, "rb") as image_file:
                     file_bytes = image_file.read()
 
-                supabase_client.storage.from_("image_produits").upload(path=unique_filename, file=file_bytes,
-                                                                       file_options={
-                                                                           "content-type": f"image/{file_extension.replace('.', '')}"})
+                supabase_client.storage.from_("image_produits").upload(
+                    path=unique_filename, file=file_bytes,
+                    file_options={"content-type": f"image/{file_extension.replace('.', '')}"}
+                )
                 final_image_url = supabase_client.storage.from_("image_produits").get_public_url(unique_filename)
             except Exception as upload_error:
                 print(f"Erreur lors du téléversement de l'image : {upload_error}")
                 final_image_url = DEFAULT_IMAGE
 
+        # Détermination de la catégorie selon le switch
+        category = self.p_category.value if self.p_new_category.disabled else self.p_new_category.value.strip()
+        if not category:
+            category = "Général"
+
         payload = {
             "tenant_id": self.tenant_id,
             "designation": self.p_name.value.strip(),
-            "product_type": self.p_category.value,
+            "product_type": category,
             "price": float(self.p_price.value),
             "price_buy": float(self.p_price_buy.value) if self.p_price_buy.value else 0.0,
             "stock": int(self.p_stock.value or 0),
@@ -609,13 +649,40 @@ class Products(ft.Container):
         }
 
         try:
-            await supabase_request_async(
+            # 1. Premier INSERT : On laisse PostgreSQL générer l'id unique dans 'products'
+            res_products = await supabase_request_async(
                 access_token=self.access_token,
                 tenant_id=self.tenant_id,
                 table_name="products",
                 method="POST",
                 data=payload
             )
+
+            # 2. Extraction sécurisée de l'ID généré pour l'alignement des tables
+            generated_id = None
+            if isinstance(res_products, list) and len(res_products) > 0:
+                generated_id = res_products[0].get("id")
+            elif isinstance(res_products, dict):
+                generated_id = res_products.get("id")
+
+            # Sécurité si l'API Supabase ne retourne pas directement la ligne créée
+            if not generated_id:
+                # Option de secours : aller chercher le dernier produit inséré avec cette désignation
+                params_lookup = {'select': 'id', 'tenant_id': f'eq.{self.tenant_id}',
+                                 'designation': f'eq.{payload["designation"]}', 'order': 'id.desc', 'limit': 1}
+                lookup = await supabase_request_async(
+                    access_token=self.access_token, tenant_id=self.tenant_id,
+                    table_name="products", method="GET", params=params_lookup
+                )
+                if lookup and len(lookup) > 0:
+                    generated_id = lookup[0].get("id")
+
+            if not generated_id:
+                raise Exception("Impossible de récupérer l'ID unique généré par la table products.")
+
+            # 3. On force l'ID identique pour la table 'stock_tampons' afin d'éviter la violation de contrainte unique
+            payload["id"] = int(generated_id)
+
             await supabase_request_async(
                 access_token=self.access_token,
                 tenant_id=self.tenant_id,
@@ -623,15 +690,25 @@ class Products(ft.Container):
                 method="POST",
                 data=payload
             )
+
+            # 4. Fermeture de la modale et rechargement
             self.cp.hide_container(self.cp.st_container)
+
+            # Pour éviter l'AssertionError Flet, on recharge les données dans le thread principal ou de façon sécurisée
             await self.load_products_data()
-            self.cp.show_alert("Produit enregistré avec succès !", ft.Icons.CHECK_CIRCLE, ft.Colors.GREEN)
+            self.cp.show_alert("Produit enregistré et synchronisé avec succès !", ft.Icons.CHECK_CIRCLE,
+                               ft.Colors.GREEN)
+
         except Exception as ex:
             print(f"Erreur d'insertion du produit : {ex}")
-            self.cp.show_alert("Erreur lors de l'enregistrement en BDD.", ft.Icons.ERROR, ft.Colors.RED)
+            self.cp.show_alert(f"Erreur lors de l'enregistrement : {str(ex)}", ft.Icons.ERROR, ft.Colors.RED)
 
         self.loader.visible = False
-        self.cp.page.update()
+        try:
+            self.update()
+        except Exception:
+            if self.cp.page:
+                self.cp.page.update()
 
     # --- Modification de produit ---
     def on_file_picker_result(self, e: ft.FilePickerResultEvent):
@@ -730,9 +807,9 @@ class Products(ft.Container):
         self.selected_image_path = None
 
         # 4. Configuration de l'interface graphique du conteneur st_container
-        self.cp.st_container.content.width = 500
-        self.cp.st_container.content.height = 550
-
+        self.cp.edit_ref_container.content.width = 500
+        self.cp.edit_ref_container.content.height = 550
+        self.cp.edit_ref_form.content.controls.clear()
         form_content = ft.Column(
             expand=True,
             spacing=15,
@@ -745,7 +822,7 @@ class Products(ft.Container):
                             ft.Text("Modifier le Produit", size=18, font_family="PEB"),
                             ft.Container(
                                 content=ft.Image(resource_path("assets/icons/black/x.svg"), width=20, height=20),
-                                on_click=lambda _: self.cp.hide_container(self.cp.st_container)
+                                on_click=lambda _: self.cp.hide_container(self.cp.edit_ref_container)
                             )
                         ]
                     ),
@@ -792,8 +869,8 @@ class Products(ft.Container):
             ]
         )
 
-        self.cp.st_container.content.content = form_content
-        self.cp.show_container(self.cp.st_container)
+        self.cp.edit_ref_container.content.content = form_content
+        self.cp.show_container(self.cp.edit_ref_container)
         self.cp.page.update()
 
     async def save_edit_product(self, e):

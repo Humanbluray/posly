@@ -68,7 +68,8 @@ if __name__ == "__main__":
         target=main,
         assets_dir="assets",
         route_url_strategy="default",
-        port=port
+        port=port,
+        view=ft.AppView.WEB_BROWSER
     )
     
     

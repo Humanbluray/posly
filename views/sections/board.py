@@ -6,7 +6,7 @@ from utils import (
 )
 from services.async_function import supabase_request_async
 import asyncio, threading
-from styles import stat_style
+from styles import stat_style, card_kpi_style
 
 
 class Board(ft.Container):
@@ -65,210 +65,52 @@ class Board(ft.Container):
         )
 
         # ----- Layout principal -----
-        self.content = ft.Container(
-            expand=True,
-            padding=20,
-
-            content=ft.Column(
-                scroll=ft.ScrollMode.AUTO,
-                spacing=20,
-
-                controls=[
-
-                    # ====================================================
-                    # HEADER
-                    # ====================================================
-
-                    ft.Container(
-                        padding=25,
-
-                        bgcolor=CARD_BG,
-
-                        border_radius=16,
-
-                        border=ft.border.all(
-                            1,
-                            BORDER_COLOR
-                        ),
-
-                        content=ft.Column(
-                            spacing=5,
-
-                            controls=[
-
-                                ft.Text(
-                                    f"Bonjour {self.user_name} 👋",
-                                    size=26,
-                                    font_family="PEB"
-                                ),
-
-                                ft.Text(
-                                    "Voici les performances de votre activité",
-                                    size=13,
-                                    color=TEXT_SECONDARY,
-                                    font_family="PPN"
-                                )
-                            ]
+        self.content = ft.Column(
+            controls=[
+                # Message de bienvenue
+                ft.Column(
+                    controls=[
+                        ft.Text(f"Bonjour {self.user_name} 👋", size=22, font_family="PEB"),
+                        ft.Text(
+                            "Voici les performances de votre activité", size=13,
+                            color=TEXT_SECONDARY, font_family="PPN"
                         )
-                    ),
+                    ], spacing=2
+                ),
 
-                    # ====================================================
-                    # KPI 1
-                    # ====================================================
-
-                    ft.ResponsiveRow(
-                        controls=[
-                            self.build_card_container(self.ca_stats, 3),
-                            self.build_card_container(self.marge_stats, 3),
-                            self.build_card_container(self.mix_stats, 3),
-                            self.build_card_container(self.stock_stats, 3),
-                        ]
-                    ),
-
-                    # ====================================================
-                    # GRAPHIQUES
-                    # ====================================================
-
-                    ft.ResponsiveRow(
-
-                        controls=[
-
-                            ft.Container(
-                                col={"xs": 12, "lg": 7},
-
-                                bgcolor=CARD_BG,
-
-                                border_radius=16,
-
-                                border=ft.border.all(
-                                    1,
-                                    BORDER_COLOR
-                                ),
-
-                                padding=20,
-
-                                content=ft.Column(
-                                    controls=[
-
-                                        ft.Text(
-                                            "Évolution des ventes",
-                                            size=18,
-                                            font_family="PPM"
-                                        ),
-
-                                        self.chart_container
-                                    ]
-                                )
-                            ),
-
-                            ft.Container(
-                                col={"xs": 12, "lg": 5},
-
-                                bgcolor=CARD_BG,
-
-                                border_radius=16,
-
-                                border=ft.border.all(
-                                    1,
-                                    BORDER_COLOR
-                                ),
-
-                                padding=20,
-
-                                content=ft.Column(
-                                    controls=[
-
-                                        ft.Text(
-                                            "Top produits",
-                                            size=18,
-                                            font_family="PPM"
-                                        ),
-
-                                        self.top_products_container
-                                    ]
-                                )
-                            ),
-                        ]
-                    ),
-
-                    # ====================================================
-                    # PERFORMANCE PAR CATEGORIE
-                    # ====================================================
-
-                    ft.Container(
-
-                        bgcolor=CARD_BG,
-
-                        border_radius=16,
-
-                        border=ft.border.all(
-                            1,
-                            BORDER_COLOR
+                # section CA et ...
+                ft.Row(
+                    controls=[
+                         # Section chiffre d'affaires...
+                        ft.Container(
+                            **stat_style, content=ft.Column(
+                                controls=[
+                                    # header..
+                                    ft.Row(
+                                        controls=[
+                                            ft.Image(resource_path('assets/icons/grey/banknote-check.svg'), width=14, height=14),
+                                            ft.Text("Chiffre d'affaires", size=13, color=TEXT_SECONDARY, font_family="PPM"),
+                                        ],
+                                    ),
+                                    self.ca_stats,
+                                ]
+                            )
                         ),
-
-                        padding=20,
-
-                        content=ft.Column(
-                            controls=[
-
-                                ft.Text(
-                                    "Performance par catégorie",
-                                    size=18,
-                                    font_family="PPM"
-                                ),
-
-                                self.type_classement_container
-                            ]
-                        )
-                    ),
-                ]
-            )
+                    ]
+                )
+            ]
         )
 
         self.on_mount()
 
-    def build_card_container(self, content, lg=3):
-
-        return ft.Container(
-            col={
-                "xs": 12,
-                "sm": 6,
-                "md": 6,
-                "lg": lg
-            },
-
-            bgcolor=CARD_BG,
-
-            border_radius=16,
-
-            border=ft.border.all(
-                1,
-                BORDER_COLOR
-            ),
-
-            padding=20,
-
-            content=content
-        )
-
-    # ---- Méthode utilitaire pour titre de section ----
-    def _build_section_title(self, title: str, icon_path: str, icon_size: int = 20):
-        return ft.Row(
-            controls=[
-                ft.Image(src=resource_path(icon_path), width=icon_size, height=icon_size, color=MAIN_COLOR),
-                ft.Text(title, size=18 if icon_size <= 20 else 22, font_family="PPM", color=TEXT_PRIMARY, weight=ft.FontWeight.W_600),
-            ],
-            spacing=10,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
     # ---- build_stat_item avec style pro ----
-    def build_stat_item(self, title: str, icon: str, object_value: object, percent: float, unit: str = "XAF"):
+    @staticmethod
+    def build_stat_item(title: str, icon: str, object_value: object, percent, unit: str = "XAF"):
         if percent is not None:
-            if percent > 0:
+            if float(percent) > 0:
                 prog_icon = resource_path('assets/icons/others/trending-up.svg')
                 color = "green"
-            elif percent < 0:
+            elif float(percent) < 0:
                 prog_icon = resource_path('assets/icons/others/trending-down.svg')
                 color = 'red'
             else:
@@ -298,7 +140,7 @@ class Board(ft.Container):
                 offset=ft.Offset(0, 4),
             ),
             border=ft.border.all(0.5, ft.Colors.with_opacity(0.1, ft.Colors.BLACK)),
-            width=220,  # adaptez selon la largeur du parent
+            width=270,  # adaptez selon la largeur du parent
             height=90,
             content=ft.Column(
                 spacing=4,
@@ -306,10 +148,11 @@ class Board(ft.Container):
                     ft.Row(
                         controls=[
                             ft.Text(title, size=13, font_family="PPM", color=TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-                            ft.Image(resource_path(icon), width=16, height=16, color=TEXT_SECONDARY),
+                            ft.Image(resource_path(icon), width=15, height=15, color=TEXT_SECONDARY),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                     ),
+                    ft.Divider(height=2, color=ft.Colors.TRANSPARENT),
                     ft.Row(
                         controls=[
                             object_value,
@@ -325,10 +168,6 @@ class Board(ft.Container):
             ),
         )
 
-    # ---- Les méthodes asynchrones restent strictement identiques ----
-    # (get_ca_kpis, get_marge_kpis, get_operational_kpis, get_stock_kpis, get_chart_7_days, get_top_5_products, get_type_performance)
-    # Je ne les recopie pas ici pour éviter de surcharger, mais elles sont inchangées.
-    # Assurez-vous de les inclure dans votre fichier final.
     @staticmethod
     def run_async_in_thread(coro):
         """Exécute une coroutine asynchrone dans un thread séparé"""
@@ -345,18 +184,18 @@ class Board(ft.Container):
 
     async def on_init_async(self):
         await self.get_ca_kpis()
-        await self.get_marge_kpis()
-        await self.get_operational_kpis()
-        await self.get_stock_kpis()
-        await self.get_chart_7_days()
-        await self.get_top_5_products()
-        await self.get_type_performance()
+        # await self.get_marge_kpis()
+        # await self.get_operational_kpis()
+        # await self.get_stock_kpis()
+        # await self.get_chart_7_days()
+        # await self.get_top_5_products()
+        # await self.get_type_performance()
 
     # ----- Les méthodes asynchrones restent inchangées (je les inclus par souci de complet) -----
     # Si vous les avez déjà ailleurs, vous pouvez supprimer les duplications.
     # Mais pour que le fichier soit fonctionnel, je les recopie ici.
 
-    async def get_ca_kpis(self) -> dict:
+    async def get_ca_kpis(self):
         try:
             params = {'select': "*"}
             kpi_ca = await supabase_request_async(
@@ -366,21 +205,30 @@ class Board(ft.Container):
                 method="GET",
                 params=params
             )
+            print(f"DEBUG [kpi CA]: | type: {type(kpi_ca)} | valeur: {kpi_ca}")
+
             if isinstance(kpi_ca, list) and len(kpi_ca) > 0:
                 ca_global = kpi_ca[0].get('ca_total', 0)
                 self.ca_global.value = format_milliers_fr(ca_global)
+                print(f"DEBUG [ca_global] | {ca_global}")
 
                 ca_mois = kpi_ca[0].get('ca_mois_en_cours')
                 ca_mois_passe = kpi_ca[0].get('ca_mois_dernier')
                 progres_mois = ca_mois - ca_mois_passe
                 percent_mois = 100 if ca_mois_passe == 0 else progres_mois * 100 / ca_mois_passe
                 self.ca_mois.value = format_milliers_fr(ca_mois)
+                print(f"DEBUG [ca_mois] | {ca_mois}")
+                print(f"DEBUG [ca_mois_passe] | {ca_mois_passe}")
+                print(f"DEBUG [percent_mois] | {percent_mois}")
 
                 ca_jour = kpi_ca[0].get('ca_aujourdhui')
                 ca_hier = kpi_ca[0].get('ca_hier')
                 progres_jour = ca_jour - ca_hier
                 percent_jour = 100 if ca_hier == 0 else progres_jour * 100 / ca_hier
                 self.ca_jour.value = format_milliers_fr(ca_jour)
+                print(f"DEBUG [ca_jour] | {ca_jour}")
+                print(f"DEBUG [ca_hier] | {ca_hier}")
+                print(f"DEBUG [percent_jour] | {percent_jour}")
 
                 self.ca_stats.controls.clear()
                 self.ca_stats.controls.extend([
@@ -388,7 +236,8 @@ class Board(ft.Container):
                     self.build_stat_item("CA mois en cours", "assets/icons/grey/badge-cent.svg", self.ca_mois, percent_mois),
                     self.build_stat_item("CA aujourd'hui", "assets/icons/grey/badge-cent.svg", self.ca_jour, percent_jour),
                 ])
-                self.cp.page.update()
+                # self.cp.page.update()
+
         except Exception as e:
             print(f"[ERREUR KPI CA] : {e}")
 

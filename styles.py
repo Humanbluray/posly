@@ -104,10 +104,10 @@ switch_style: dict = dict(
     inactive_track_color=BORDER_COLOR,
     thumb_color={
         ft.ControlState.SELECTED: MAIN_COLOR,
-        ft.ControlState.DEFAULT: ft.Colors.WHITE,
+        ft.ControlState.DEFAULT: ft.Colors.BLACK54,
     },
     track_color={
-        ft.ControlState.SELECTED: ft.Colors.with_opacity(0.4, MAIN_COLOR),
+        ft.ControlState.SELECTED: ft.Colors.with_opacity(0.7, BORDER_COLOR),
         ft.ControlState.DEFAULT: BORDER_COLOR,
     },
 )
@@ -209,6 +209,19 @@ settings_style: dict = dict(
     shadow=ft.BoxShadow(
         spread_radius=0,
         blur_radius=4,
+        color=ft.Colors.with_opacity(0.04, "#000000"),
+        offset=ft.Offset(0, 2),
+    ),
+)
+
+card_kpi_style: dict = dict(
+    bgcolor="white",
+    border_radius=12,
+    padding=24,
+    # border=ft.border.all(1, "#E2E8F0"), # Bordure Slate 200 très fine
+    shadow=ft.BoxShadow(
+        spread_radius=0,
+        blur_radius=8,
         color=ft.Colors.with_opacity(0.04, "#000000"),
         offset=ft.Offset(0, 2),
     ),
