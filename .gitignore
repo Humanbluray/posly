@@ -1,1 +1,17 @@
+# Sécurité (votre ligne actuelle)
 .env
+
+# Environnement virtuel (À ignorer absolument)
+.venv/
+venv/
+env/
+ENV/
+
+# Caches Python (Générés automatiquement en local)
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Fichiers de configuration de votre éditeur (VS Code / PyCharm)
+.vscode/
+.idea/.env
