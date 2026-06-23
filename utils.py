@@ -228,20 +228,20 @@ def separateur_milliers(value):
 
 
 def resource_path(relative_path):
-    """
-    Obtient le chemin absolu vers la ressource dans l'environnement PyInstaller
-    (en utilisant sys._MEIPASS) ou dans le dossier du projet (mode dev).
-    """
+    # Si on est sur Railway (environnement Cloud), Flet gère les assets via le serveur Web.
+    # On transforme juste 'assets/icons/file.svg' en '/icons/file.svg'
+    if os.getenv("PORT"):
+        if relative_path.startswith("assets/"):
+            return relative_path.replace("assets", "")
+        if not relative_path.startswith("/"):
+            return "/" + relative_path
+        return relative_path
+
+    # --- Ton code d'origine pour PyInstaller (Laisse-le pour ton mode local/EXE) ---
     try:
-        # Chemin dans l'environnement PyInstaller (dist/main/_internal)
         base_path = sys._MEIPASS
     except Exception:
-        # Chemin en mode développement (dossier du projet)
         base_path = os.path.abspath(".")
-
-        # On ajoute "assets/" au chemin si l'on ne le met pas dans le code appelant
-    # Attention : la destination dans PyInstaller est 'assets/'
-    # Donc le chemin complet est base_path/assets/fonts/Figtree-*.ttf
     return os.path.join(base_path, relative_path)
 
 def find_facture_number():
