@@ -1,6 +1,0 @@
-{
-  "packages": [
-    "libcairo2-dev",
-    "pkg-config"
-  ]
-}
