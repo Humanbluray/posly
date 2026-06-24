@@ -287,10 +287,17 @@ class Board(ft.Container):
                                          percent_jour),
                 ])
                 self.ca_stats.update()
+            
+            else:
+                self.ca_stats.controls.clear()
+                self.ca_stats.controls.append(
+                    ft.Text("Aucune donnée pour le moment", size=14, font_family='PPM')
+                )
+                self.cp.page.update()  
 
         except Exception as e:
             print(f"[ERREUR KPI CA] : {e}")
-
+            
     async def get_marge_kpis(self):
         try:
             params = {"select": "qte, prix, factures(creation_month, creation_year), products(price_buy)",
@@ -332,6 +339,14 @@ class Board(ft.Container):
                                                   self.taux_marge, unit="%"),
                 ])
                 self.marge_kpi_container.update()
+            
+            else:
+                self.marge_kpi_container.controls.clear()
+                self.marge_kpi_container.controls.append(
+                    ft.Text("Aucune donnée pour le moment", size=14, font_family='PPM')
+                )
+                self.cp.page.update()
+                
         except Exception as e:
             print(f"[ERREUR KPI MARGE] : {e}")
 
@@ -387,6 +402,7 @@ class Board(ft.Container):
             self.ops_kpi_container.update()
 
             self.stock_distribution_container.controls.clear()
+            
             if stocks_par_categorie:
                 for cat, qte in sorted(stocks_par_categorie.items(), key=lambda item: item[1], reverse=True):
                     pourcentage = qte / quantite_totale_stock if quantite_totale_stock > 0 else 0
@@ -401,7 +417,15 @@ class Board(ft.Container):
                                            bgcolor=ft.Colors.with_opacity(0.1, MAIN_COLOR), height=5)
                         ])
                     )
+            else:
+                self.stock_distribution_container.controls.clear()
+                self.stock_distribution_container.controls.append(
+                    ft.Text("Pas de données disponibles pour le moment", size=14, font_family='PPM')
+                )
+                
             self.stock_distribution_container.update()
+            
+            
         except Exception as e:
             print(f"[ERREUR KPI OPS/STOCKS] : {e}")
 
@@ -494,6 +518,15 @@ class Board(ft.Container):
 
                 self.chart_container.content = ft.Column(controls=[line_chart, legend], expand=True)
                 self.chart_container.update()
+        
+            else:
+                self.chart_container.content = ft.Container(
+                    content=ft.Text("Pas de données pour les 7 derniers jours.", font_family="PPM",
+                                    color=TEXT_SECONDARY),
+                    alignment=ft.alignment.center
+                )
+                self.cp.page.update()
+        
         except Exception as e:
             print(f"[ERREUR GRAPH_7_JOURS] : {e}")
 
@@ -639,7 +672,7 @@ class Board(ft.Container):
                     content=ft.Text("Impossible de charger le classement des produits", color="red"),
                     alignment=ft.alignment.center
                 )
-                self.update()
+                self.cp.page.update()
 
     # 🌟 TABLEAU 3 : Classement dynamique de performance des catégories
     async def get_type_performance(self):
@@ -698,5 +731,13 @@ class Board(ft.Container):
                     )
                     self.type_classement_container.controls.append(row_item)
                 self.type_classement_container.update()
+        
+            else:
+                self.type_classement_container.controls.clear()
+                self.type_classement_container.append(
+                    ft.Text("Aucune donnée pour le moment", size=14, font_family='PPM')
+                )
+                self.cp.page.update()
+        
         except Exception as e:
             print(f"[ERREUR TYPE_PERFORMANCE] : {e}")
