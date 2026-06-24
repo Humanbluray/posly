@@ -1067,12 +1067,10 @@ class Reports(ft.Container):
 
     async def open_cloture_window(self, e):
         # 1. Format ISO STRICT pour la vérification de la table caisse (type date natif)
-        # date_iso_supabase = date.today().strftime("%Y-%m-%d")  # Génère "2026-06-20"
-        # date_iso_supabase = "2026-06-19"
+        date_iso_supabase = date.today().strftime("%Y-%m-%d")  # Génère "2026-06-20"
+       
         # 2. Format d'affichage ET de filtrage correspondant à la colonne text creation_date ("DD/MM/YYYY")
         date_affichage_fr = convert_date_to_string(date.today())  # Génère "20/06/2026"
-        date_iso_supabase = "2026-06-21"
-        date_affichage_fr = '21/06/2026'
 
         # Vérifier si la journée d'aujourd'hui est déjà clôturée dans la table caisse
         check_params = {
