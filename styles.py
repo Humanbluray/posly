@@ -122,7 +122,6 @@ datatable_style: dict = dict(
     border=ft.border.all(1, BORDER_COLOR),
     border_radius=8,
     horizontal_margin=10,
-    show_bottom_border=True,
     data_row_min_height=50,
 
 

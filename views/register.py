@@ -44,8 +44,8 @@ class RegisterView(ft.View):
                     ft.Row(
                         spacing=2,
                         controls=[
-                            ft.Text("Pos", size=24, font_family="PEB", color=TEXT_PRIMARY),
-                            ft.Text("ly", size=24, font_family="PEB", color=MAIN_COLOR),
+                            ft.Text("Alti", size=24, font_family="PEB", color=TEXT_PRIMARY),
+                            ft.Text("Pos", size=24, font_family="PEB", color=MAIN_COLOR),
                         ],
                     ),
                     # Actions à droite
@@ -114,7 +114,7 @@ class RegisterView(ft.View):
         # --- CHAMPS ÉTAPE 2 : Compte Administrateur ---
         self.admin_name = ft.TextField(
             **input_style, label="Votre nom complet *", 
-            prefix_icon=ft.Icons.PERSON_PIN_OUTLINED
+            prefix_icon=ft.Icons.PERSON_PIN_OUTLINED, expand=True
         )
         self.login = ft.TextField(
             **input_style, label="Adresse Email *", 
@@ -156,7 +156,7 @@ class RegisterView(ft.View):
                     controls=[
                         ft.ProgressRing(width=40, height=40, stroke_width=3, color=MAIN_COLOR),
                         ft.Text("Veuillez patienter...", size=16, font_family="PEB", color="black"),
-                        ft.Text("Création de votre espace Posly en cours", size=12, font_family="PPM", color="grey", text_align=ft.TextAlign.CENTER),
+                        ft.Text("Création de votre espace AltiPos en cours", size=12, font_family="PPM", color="grey", text_align=ft.TextAlign.CENTER),
                     ]
                 )
             )
@@ -167,7 +167,7 @@ class RegisterView(ft.View):
 
         # Carte blanche principale du formulaire
         form_card = ft.Container(
-            padding=40, width=450,
+            padding=40, width=700,
             bgcolor="white",
             border_radius=16,
             border=ft.border.all(1, "#E2E8F0"), # Bordure Slate 200 très fine
@@ -182,8 +182,8 @@ class RegisterView(ft.View):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Text("Pos", size=36, color="black", font_family="PEB"),
-                            ft.Text("ly", size=36, color=MAIN_COLOR, font_family="PEB"),
+                            ft.Text("Alti", size=36, color="black", font_family="PEB"),
+                            ft.Text("Pos", size=36, color=MAIN_COLOR, font_family="PEB"),
                         ], spacing=0, alignment=ft.MainAxisAlignment.CENTER,
                     ),
                     ft.Row(
@@ -222,7 +222,7 @@ class RegisterView(ft.View):
                 controls=[
                     ft.Column(
                         expand=True,
-                        spacing=0,
+                        spacing=50,
                         controls=[
                             top_bar,  # Barre fixée en haut
                             ft.Container(
@@ -251,10 +251,8 @@ class RegisterView(ft.View):
             
             self.slide_container.controls = [
                 ft.Text("L'ÉTABLISSEMENT", size=12, font_family="PEB", color=MAIN_COLOR),
-                self.company_name,
-                self.slogan,
-                self.contact,
-                self.adresse,
+                ft.Row([self.company_name, self.slogan,]),
+                ft.Row([self.contact, self.adresse,]),
                 ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
                 ft.Row(
                     controls=[self.btn_select_logo, self.logo_info_text],
@@ -270,6 +268,7 @@ class RegisterView(ft.View):
                     on_click=self.go_to_admin_step
                 )
             ]
+
         else:
             # Animation des points : Slide 2 actif (Pilule)
             self.dot1.bgcolor = "grey300"
@@ -279,9 +278,8 @@ class RegisterView(ft.View):
             
             self.slide_container.controls = [
                 ft.Text("COMPTE ADMINISTRATEUR", size=12, font_family="PEB", color=MAIN_COLOR),
-                self.admin_name,
-                self.login,
-                self.password,
+                ft.Row([self.admin_name, ]),
+                ft.Row([self.login, self.password,]),
                 self.error_text,
                 ft.Divider(height=5, color=ft.Colors.TRANSPARENT),
                 ft.Row(

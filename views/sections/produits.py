@@ -943,15 +943,14 @@ class Products(ft.Container):
         self.run_async_in_thread(self.process_excel_import(e.files[0].path))
 
     async def process_excel_import(self, filepath):
-        self.loader.visible = True
-        self.cp.page.update()
+        self.cp.show_container(self.cp.waiting_container)
 
         try:
             import openpyxl
             wb = openpyxl.load_workbook(filepath, data_only=True)
             sheet = wb.active
             success_count = 0
-
+                
             for row in sheet.iter_rows(min_row=2, values_only=True):
                 # Sécurité : Si la ligne est vide ou si la désignation (colonne 1) est absente
                 if not row or row[0] is None:
@@ -1038,7 +1037,7 @@ class Products(ft.Container):
             print(f"Erreur d'importation Excel : {ex}")
             self.cp.show_alert("Fichier Excel invalide ou corrompu.", ft.Icons.ERROR, ft.Colors.RED)
 
-        self.loader.visible = False
+        self.cp.hide_container(self.cp.waiting_container)
         self.cp.page.update()
 
     def generate_excel_template(self, e):

@@ -6,18 +6,18 @@ from styles import input_style, button_primary_style
 from services.supabase_client import supabase_client
 
 
-class ForgotPasswordView(ft.View):
+class ResetPasswordView(ft.View):
     def __init__(self, page: ft.Page):
         super().__init__(
             vertical_alignment=ft.MainAxisAlignment.START,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             bgcolor=BG_COLOR,
-            route="/forgot-password",
+            route="/reset-password",
             padding=0,
         )
         self.page = page
 
-        # --- BARRE DE NAVIGATION HAUTE COHÉRENTE ---
+        # --- BARRE DE NAVIGATION HAUTE ---
         top_bar = ft.Container(
             padding=ft.padding.symmetric(horizontal=30, vertical=14),
             bgcolor=CARD_BG,
@@ -29,49 +29,37 @@ class ForgotPasswordView(ft.View):
                     ft.Row(
                         spacing=2,
                         controls=[
-                            ft.Text("ALti", size=24, font_family="PEB", color=TEXT_PRIMARY),
+                            ft.Text("Alti", size=24, font_family="PEB", color=TEXT_PRIMARY),
                             ft.Text("Pos", size=24, font_family="PEB", color=MAIN_COLOR),
                         ],
                     ),
-                    ft.Row(
-                        spacing=12,
-                        controls=[
-                            ft.TextButton(
-                                "Se connecter",
-                                style=ft.ButtonStyle(
-                                    color=TEXT_SECONDARY,
-                                    text_style=ft.TextStyle(size=14, font_family="PPM"),
-                                ),
-                                on_click=lambda e: self.page.go("/"),
-                            ),
-                            ft.TextButton(
-                                "S'inscrire",
-                                style=ft.ButtonStyle(
-                                    color=TEXT_SECONDARY,
-                                    text_style=ft.TextStyle(size=14, font_family="PPM"),
-                                ),
-                                on_click=lambda e: self.page.go("/register"),
-                            ),
-                            ft.TextButton(
-                                "Mot de passe oublié ?",
-                                style=ft.ButtonStyle(
-                                    color=MAIN_COLOR,  # Actif sur cette page
-                                    text_style=ft.TextStyle(size=14, font_family="PEB"),
-                                ),
-                                on_click=lambda e: self.page.go("/forgot-password"),
-                            ),
-                        ],
-                    ),
+                    ft.Text(
+                        "Sécurisation du compte",
+                        size=14,
+                        font_family="PPM",
+                        color=TEXT_SECONDARY,
+                    )
                 ],
             ),
         )
 
-        # --- CHAMP EMAIL ---
-        self.email_field = ft.TextField(
+        # --- CHAMPS DE SAISIE ---
+        self.password_field = ft.TextField(
             **input_style,
-            prefix_icon=ft.Icons.EMAIL_OUTLINED,
-            label="Adresse Email *",
-            hint_text="vantech.infos@gmail.com",
+            prefix_icon=ft.Icons.LOCK_OUTLINED,
+            label="Nouveau mot de passe *",
+            hint_text="Entrez votre nouveau mot de passe",
+            password=True,
+            can_reveal_password=True,
+        )
+
+        self.confirm_password_field = ft.TextField(
+            **input_style,
+            prefix_icon=ft.Icons.LOCK_CLOCK_OUTLINED,
+            label="Confirmer le mot de passe *",
+            hint_text="Répétez le mot de passe",
+            password=True,
+            can_reveal_password=True,
         )
 
         self.error_text = ft.Text("", color="red", font_family="PPM", size=13, visible=False)
@@ -79,7 +67,7 @@ class ForgotPasswordView(ft.View):
 
         # --- BOUTON D'ACTION ---
         self.loader = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white", visible=False)
-        self.btn_text = ft.Text("Envoyer le lien de récupération", size=16, font_family="PPM", color="white")
+        self.btn_text = ft.Text("Mettre à jour le mot de passe", size=16, font_family="PPM", color="white")
 
         self.submit_button = ft.ElevatedButton(
             content=ft.Row(
@@ -87,7 +75,7 @@ class ForgotPasswordView(ft.View):
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             style=button_primary_style,
-            on_click=self.handle_reset_request,  # Flet lie automatiquement l'événement asynchrone
+            on_click=self.handle_password_change,
             width=float("inf"),
             height=48,
         )
@@ -98,7 +86,7 @@ class ForgotPasswordView(ft.View):
             padding=ft.padding.symmetric(horizontal=40, vertical=40),
             bgcolor="white",
             border_radius=36,
-            border=ft.border.all(1, "#E2E8F0"),  # Bordure Slate 200 très fine
+            border=ft.border.all(1, "#E2E8F0"),
             shadow=ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=4,
@@ -111,32 +99,25 @@ class ForgotPasswordView(ft.View):
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                 controls=[
                     ft.Text(
-                        "Réinitialiser le mot de passe",
+                        "Nouveau mot de passe",
                         size=24,
                         font_family="PEB",
                         color=TEXT_PRIMARY,
                         text_align=ft.TextAlign.CENTER,
                     ),
                     ft.Text(
-                        "Entrez l'adresse email rattachée à votre compte. Nous vous enverrons un lien sécurisé pour créer un nouveau mot de passe.",
+                        "Choisissez un mot de passe fort pour sécuriser définitivement l'accès à votre catalogue.",
                         size=14,
                         font_family="PPM",
                         color=TEXT_SECONDARY,
                         text_align=ft.TextAlign.CENTER,
                     ),
                     ft.Divider(height=8, color=ft.Colors.TRANSPARENT),
-                    self.email_field,
+                    self.password_field,
+                    self.confirm_password_field,
                     self.error_text,
                     self.success_text,
                     self.submit_button,
-                    ft.TextButton(
-                        "Retour à la page de connexion",
-                        style=ft.ButtonStyle(
-                            color=TEXT_SECONDARY,
-                            text_style=ft.TextStyle(size=14, font_family="PPM"),
-                        ),
-                        on_click=lambda e: self.page.go("/"),
-                    ),
                 ],
             ),
         )
@@ -157,39 +138,55 @@ class ForgotPasswordView(ft.View):
             )
         ]
 
-    # 🌟 Transformation de la méthode en fonction Asynchrone
-    async def handle_reset_request(self, e):
-        email = self.email_field.value.strip()
+    async def handle_password_change(self, e):
+        new_password = self.password_field.value.strip()
+        confirm_password = self.confirm_password_field.value.strip()
 
-        if not email:
-            await self.show_message("Veuillez saisir votre adresse email.", is_error=True)
+        # Validations basiques
+        if not new_password or not confirm_password:
+            await self.show_message("Veuillez remplir tous les champs.", is_error=True)
             return
 
+        if new_password != confirm_password:
+            await self.show_message("Les deux mots de passe ne correspondent pas.", is_error=True)
+            return
+
+        if len(new_password) < 6:
+            await self.show_message("Le mot de passe doit contenir au moins 6 caractères.", is_error=True)
+            return
+
+        # UI en état de chargement
         self.error_text.visible = False
         self.success_text.visible = False
         self.loader.visible = True
-        self.btn_text.value = "Envoi en cours..."
+        self.btn_text.value = "Modification en cours..."
         self.submit_button.disabled = True
         self.page.update()
 
         try:
-            # Appel Supabase pour envoyer le mail de réinitialisation
-            supabase_client.auth.reset_password_for_email(email)
+            # Envoi de la mise à jour à Supabase sur l'utilisateur de la session courante
+            supabase_client.auth.update_user({"password": new_password})
 
             await self.show_message(
-                "Un email de récupération a été envoyé avec succès ! Vérifiez votre boîte de réception.",
+                "Mot de passe mis à jour avec succès ! Redirection...",
                 is_error=False
             )
-            self.email_field.value = ""  # On vide l'input après le succès
+            self.page.update()
+
+            # Petite pause pour laisser l'utilisateur lire le message de succès avant de l'envoyer au Login
+            import asyncio
+            await asyncio.sleep(2)
+
+            # Redirection vers la page de connexion
+            self.page.go("/")
 
         except Exception as error:
-            print(f"[ERROR RESET] : {error}")
+            print(f"[ERROR RESET UPDATE] : {error}")
             await self.show_message(
-                "Une erreur est survenue lors de l'envoi de l'email. Veuillez réessayer.",
+                "Le lien a expiré ou une erreur est survenue. Veuillez refaire une demande.",
                 is_error=True
             )
 
-    # 🌟 Transformation en fonction Asynchrone pour la cohérence des updates de la page
     async def show_message(self, message: str, is_error: bool = True):
         if is_error:
             self.error_text.value = message
@@ -201,6 +198,7 @@ class ForgotPasswordView(ft.View):
             self.error_text.visible = False
 
         self.loader.visible = False
-        self.btn_text.value = "Envoyer le lien de récupération"
+        self.btn_text.value = "Mettre à jour le mot de passe"
         self.submit_button.disabled = False
         self.page.update()
+

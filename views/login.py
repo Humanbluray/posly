@@ -33,8 +33,8 @@ class LoginView(ft.View):
                     ft.Row(
                         spacing=2,
                         controls=[
-                            ft.Text("Pos", size=24, font_family="PEB", color=TEXT_PRIMARY),
-                            ft.Text("ly", size=24, font_family="PEB", color=MAIN_COLOR),
+                            ft.Text("Alti", size=24, font_family="PEB", color=TEXT_PRIMARY),
+                            ft.Text("Pos", size=24, font_family="PEB", color=MAIN_COLOR),
                         ],
                     ),
                     ft.Row(

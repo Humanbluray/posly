@@ -59,7 +59,7 @@ class Sales(ft.Container):
             alignment=ft.alignment.center,
             content=ft.Column(
                 controls=[
-                    ft.Icon(ft.Icons.SHOPPING_BAG_OUTLINED, size=48, color="grey"),
+                    ft.Image(resource_path("assets/icons/grey/shopping-bag.svg"), width=48, height=48),
                     ft.Text("Aucun produit pour le moment", size=16, font_family="PPM", color="grey"),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -67,33 +67,30 @@ class Sales(ft.Container):
             )
         )
         self.left_container = ft.Container(
-            bgcolor=BG_COLOR, border_radius=16, padding=10,
+            **stat_style,
             expand=True,
             content=ft.Column(
                 expand=True,
                 controls=[
-                    ft.Container(
-                        content=ft.Column(
-                            controls=[
-                                ft.Row(
-                                    controls=[
-                                        ft.Row(
-                                            controls=[
-                                                ft.Text("Produits", size=22, font_family="PEB"),
-                                                ft.Container(
-                                                    padding=3, border_radius=6, width=50,
-                                                    bgcolor="black", alignment=ft.alignment.center,
-                                                    content=self.nb_products
-                                                ),
-                                            ]
-                                        ),
-                                        self.search_field
-                                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                ),
-                                self.row_filter_categories,
-                            ]
-                        ),
-                        **stat_style
+                    ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text("Produits", size=22, font_family="PEB"),
+                                            ft.Container(
+                                                padding=3, border_radius=6, width=50,
+                                                bgcolor="black", alignment=ft.alignment.center,
+                                                content=self.nb_products
+                                            ),
+                                        ]
+                                    ),
+                                    self.search_field
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            self.row_filter_categories,
+                        ]
                     ),
                     ft.Divider(height=1, color=ft.Colors.TRANSPARENT),
                     ft.Stack(
@@ -170,7 +167,6 @@ class Sales(ft.Container):
                     ),
                     ft.Column(
                         controls=[
-                            # ft.Divider(height=1, thickness=1),
                             ft.Row(
                                 controls=[
                                     ft.Text("Total", size=16, font_family="PPM", color="grey"),
@@ -181,27 +177,6 @@ class Sales(ft.Container):
                                     )
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                             ),
-                            # ft.Divider(height=1, thickness=1),
-                            # ft.Row(
-                            #     controls=[
-                            #         ft.Text("Mode", size=16, font_family="PPM", color="grey"),
-                            #         self.payment_mode
-                            #     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                            # ),
-                            # ft.Divider(height=1, thickness=1),
-                            # ft.Row(
-                            #     controls=[
-                            #         ft.Text("Encaissé", size=16, font_family="PPM", color="grey"),
-                            #         self.espece
-                            #     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                            # ),
-                            # ft.Divider(height=1, thickness=1),
-                            # ft.Row(
-                            #     controls=[
-                            #         ft.Text("Rendu", size=16, font_family="PPM", color="grey"),
-                            #         self.due
-                            #     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                            # ),
                             StyledButton(
                                 "Annuler commande", "close", self.annuler_commande
                             ),

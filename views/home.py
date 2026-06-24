@@ -284,6 +284,20 @@ class HomeView(ft.View):
                 content=self.edit_ref_form
             )
         )
+
+        self.waiting_container = ft.Container(
+            **ct_style,
+            content=ft.Container(
+                **intern_ct_style, width=300, height=300,
+                content=ft.Column(
+                    controls=[
+                        ft.Text("Veuillez patienter pendant l'opération", size=14, font_family="PPM"),
+                        ft.ProgressRing(width=30, height=30, color=MAIN_COLOR)
+                    ], alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                )
+            )
+        )
         
 
         self.snack_message = ft.Text(size=15, font_family="PPM", color="white")
@@ -310,7 +324,7 @@ class HomeView(ft.View):
                 controls=[
                     self.main_window, self.data_container, self.details_vente_container,
                     self.valid_basket_container, self.cloture_container, self.st_container,
-                    self.edit_ref_container,
+                    self.edit_ref_container, self.waiting_container
                 ]
             )
         ]
