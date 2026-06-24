@@ -235,7 +235,7 @@ class Reports(ft.Container):
         )
         self.stock_journalier_button = MyButton(
             "Stocks Journaliers",
-            resource_path("assets/icons/white/table-of-contents.svg"),  # ou une autre icône blanche de votre choix
+            resource_path("assets/icons/white/chart-candlestick.svg"),  # ou une autre icône blanche de votre choix
             lambda e: self.run_async_in_thread(self.open_stock_journalier_window(e))
         )
         self.cloture_button.visible = self.has_cashier_rights
@@ -1067,11 +1067,12 @@ class Reports(ft.Container):
 
     async def open_cloture_window(self, e):
         # 1. Format ISO STRICT pour la vérification de la table caisse (type date natif)
-        date_iso_supabase = date.today().strftime("%Y-%m-%d")  # Génère "2026-06-20"
+        # date_iso_supabase = date.today().strftime("%Y-%m-%d")  # Génère "2026-06-20"
         # date_iso_supabase = "2026-06-19"
         # 2. Format d'affichage ET de filtrage correspondant à la colonne text creation_date ("DD/MM/YYYY")
         date_affichage_fr = convert_date_to_string(date.today())  # Génère "20/06/2026"
-        # date_affichage_fr = '19/06/2026'
+        date_iso_supabase = "2026-06-21"
+        date_affichage_fr = '21/06/2026'
 
         # Vérifier si la journée d'aujourd'hui est déjà clôturée dans la table caisse
         check_params = {
@@ -1303,7 +1304,7 @@ class Reports(ft.Container):
                             ),
                             MyButton(
                                 "Exporter PDF",
-                                resource_path("assets/icons/white/file-download.svg"),
+                                resource_path("assets/icons/white/cloud-download.svg"),
                                 # Ajustez selon vos icônes existantes
                                 lambda e: self.exporter_stock_pdf()
                             )

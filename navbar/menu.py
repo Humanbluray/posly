@@ -89,11 +89,10 @@ class NavBar(ft.Column):
                         controls=[
                             ft.Row(
                                 controls=[
-                                    ft.Icon(ft.Icons.CHAIR_ALT_OUTLINED, size=28, color=MAIN_COLOR),
                                     ft.Row(
                                         controls=[
-                                            ft.Text("Pos", size=26, font_family="PEB", color=TEXT_PRIMARY),
-                                            ft.Text("ly", size=26, font_family="PEB", color=MAIN_COLOR),
+                                            ft.Text("Alti", size=26, font_family="PEB", color=TEXT_PRIMARY),
+                                            ft.Text("Pos", size=26, font_family="PEB", color=MAIN_COLOR),
                                         ],
                                         spacing=0
                                     )

@@ -64,8 +64,8 @@ class Users(ft.Container):
         )
         self.new_user_password = ft.TextField(
             **input_style, prefix_icon=ft.Icons.LOCK_OUTLINE_ROUNDED, width=440,
-            label="Mot de passe initial", password=True, can_reveal_password=True,
-            value="123456"
+            label="Mot de passe initial",
+            value="123456", disabled=True
         )
         self.new_role = ft.RadioGroup(
             content=ft.Row(

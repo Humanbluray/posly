@@ -1,5 +1,5 @@
 import flet as ft
-from utils import MAIN_COLOR, SECOND_COLOR
+from utils import MAIN_COLOR, SECOND_COLOR, resource_path
 
 
 class ItemMenu(ft.Container):
@@ -22,8 +22,8 @@ class ItemMenu(ft.Container):
         self.my_icon = my_icon
         self.my_icon_2 = my_icon_2
         self.is_clicked = False
-        self.visuel = ft.Image(src=my_icon, width=20, height=20)
-        self.visuel_2 = ft.Image(src=my_icon_2, width=20, height=20)
+        self.visuel = ft.Image(src=resource_path(my_icon), width=20, height=20)
+        self.visuel_2 = ft.Image(src=resource_path(my_icon_2), width=20, height=20)
         self.name = ft.Text(title.capitalize(), font_family="PPM", size=15, color=ft.Colors.BLACK54)
         self.name_2 = ft.Text(title.capitalize(), font_family="PPB", size=16, color="black")
         self.unselected = ft.Row(controls=[self.visuel, self.name],spacing=10)
