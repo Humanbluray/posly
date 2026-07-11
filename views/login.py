@@ -103,7 +103,7 @@ class LoginView(ft.View):
                     ft.Container(
                         width=600,
                         content=ft.Text(
-                            "Posly est une application cloud moderne conçue pour centraliser vos ventes, gérer vos utilisateurs et suivre la croissance de vos établissements en temps réel. Simple, fluide et sécurisé.",
+                            "Altipos est une application cloud moderne conçue pour centraliser vos ventes, gérer vos utilisateurs et suivre la croissance de vos établissements en temps réel. Simple, fluide et sécurisé. Prenez de l'altitude pour visualiser vos KPI",
                             size=16,
                             font_family="PPM",
                             color=TEXT_SECONDARY,

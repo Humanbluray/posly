@@ -927,7 +927,7 @@ class Reports(ft.Container):
                                               textColor=colors.white)
 
             # 1. ENTÊTE DU PDF
-            story.append(Paragraph("Postly - RAPPORT DE CLÔTURE JOURNALIER", title_style))
+            story.append(Paragraph("Altipos - RAPPORT DE CLÔTURE JOURNALIER", title_style))
             story.append(Spacer(1, 15))
 
             # Informations générales (Date, Établissement, Caissier)
