@@ -5,7 +5,7 @@ from views.register import RegisterView
 from views.forgot_password import ForgotPasswordView
 from views.reset_password import ResetPasswordView
 import os
-from utils import resource_path
+from utils import resource_path, BG_COLOR, MAIN_COLOR
 from services.supabase_client import supabase_client
 
 SIGNIN_ROUTE = "/"
@@ -44,8 +44,16 @@ def main(page: ft.Page):
         page.theme_mode = ft.ThemeMode.DARK
     else:
         page.theme_mode = ft.ThemeMode.LIGHT
+    
+    page.theme_mode = ft.ThemeMode.LIGHT
 
     page.title = "AltiPos"
+    page.splash = ft.Container(
+        content=ft.ProgressRing(color=MAIN_COLOR, width=100, height=100),
+        alignment=ft.alignment.center,
+        bgcolor=BG_COLOR
+    )
+    page.update()
 
     # --- CONFIGURATION DES ROUTES ---
     route_views = {
@@ -83,5 +91,6 @@ if __name__ == "__main__":
         assets_dir="assets",
         route_url_strategy="default",
         port=port,
-        # view=ft.AppView.WEB_BROWSER # OBLIGATOIRE pour tourner sur Railway en mode Web
+        # view=ft.AppView.WEB_BROWSER,
+        # web_renderer=ft.WebRenderer.HTML
     )

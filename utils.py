@@ -7,8 +7,6 @@ from typing import List
 # --- Pallette orange (origine) ---
 MAIN_COLOR = "#ff7f00"
 SECOND_COLOR = "#ff952b"
-# MAIN_COLOR = "#0E21A0"
-# SECOND_COLOR = "#4D2FB2"
 THIRD_COLOR = ft.Colors.DEEP_PURPLE_50
 RED_COLOR = "#e1040a"
 GREEN_COLOR = "#308f62"
